@@ -38,140 +38,100 @@ apf.actiontracker.actions.aceupdate = function(undoObj, undo){
         q[1].redoChanges(q[0]);
 };
 
-var ModesCaption = {
-    "C#" : "text/x-csharp",
-    "C/C++" : "text/x-c",
-    "Clojure" : "text/x-script.clojure",
-    "CoffeeScript" : "text/x-script.coffeescript",
-    "Coldfusion" : "text/x-coldfusion",
-    "CSS" : "text/css",
-    "Groovy" : "text/x-groovy",
-    "Java" : "text/x-java-source",
-    "JavaScript" : "application/javascript",
-    "Latex" : "application/x-latex",
-    "Script" : "text/x-script",
-    "Lua" : "text/x-lua",
-    "Markdown" : "text/x-markdown",
-    "OCaml" : "text/x-script.ocaml",
-    "PHP" : "application/x-httpd-php",
-    "Perl" : "text/x-script.perl",
-    "Powershell" : "text/x-script.powershell",
-    "Python" : "text/x-script.python",
-    "Ruby" : "text/x-script.ruby",
-    "Scala" : "text/x-scala",
-    "SCSS" : "text/x-scss",
-    "SQL" : "text/x-sql",
-    "Textile" : "text/x-web-textile",
-    "HTML" : "text/html",
-    "XML" : "application/xml"
+
+var contentTypes = {
+    "application/atom+xml":         "atom",
+    "application/javascript":       "js",
+    "application/json":             "json",
+    "application/mathml+xml":       "mml",
+    "application/rdf+xml":          "rdf",
+    "application/rss+xml":          "rss",
+    "application/wsdl+xml":         "wsdl",
+    "application/x-httpd-php":      "phtml",
+    "application/x-latex":          "ltx",
+    "application/x-sh":             "sh",
+    "application/xhtml+xml":        "xhtml",
+    "application/xml":              "xml",
+    "application/xslt+xml":         "xslt",
+    "image/svg+xml":                "svg",
+    "text/css":                     "less",
+    "text/html":                    "html",
+    "text/plain":                   "txt",
+    "text/x-c":                     "c",
+    "text/x-coldfusion":            "cfm",
+    "text/x-csharp":                "cs",
+    "text/x-groovy":                "groovy",
+    "text/x-java-source":           "java",
+    "text/x-lua":                   "lua",
+    "text/x-markdown":              "md",
+    "text/x-sass":                  "sass",
+    "text/x-scala":                 "scala",
+    "text/x-script.clojure":        "clj",
+    "text/x-script.coffeescript":   "coffee",
+    "text/x-script.ocaml":          "ml",
+    "text/x-script.perl":           "pl",
+    "text/x-script.perl-module":    "pm",
+    "text/x-script.powershell":     "ps1",
+    "text/x-script.python":         "py",
+    "text/x-script.ruby":           "rb",
+    "text/x-scss":                  "scss",
+    "text/x-sql":                   "sql",
+    "text/x-web-textile":           "textile"
 }
 
 var SupportedModes = {
-    "application/javascript": "javascript",
-    "application/json": "json",
-    "text/css": "css",
-    "text/x-scss": "scss",
-    "text/html": "html",
-    "application/xhtml+xml": "html",
-    "application/xml": "xml",
-    "application/rdf+xml": "xml",
-    "application/rss+xml": "xml",
-    "image/svg+xml": "svg",
-    "application/wsdl+xml": "xml",
-    "application/xslt+xml": "xml",
-    "application/atom+xml": "xml",
-    "application/mathml+xml": "xml",
-    "application/x-httpd-php": "php",
-    "application/x-sh": "sh",
-    "text/x-script.python": "python",
-    "text/x-script.ruby": "ruby",
-    "text/x-script.perl": "perl",
-    "text/x-script.perl-module": "perl",
-    "text/x-c": "c_cpp",
-    "text/x-java-source": "java",
-    "text/x-groovy": "groovy",
-    "text/x-csharp": "csharp",
-    "text/x-script.coffeescript": "coffee",
-    "text/x-markdown": "markdown",
-    "text/x-web-textile": "textile",
-    "text/x-script.ocaml": "ocaml",
-    "text/x-script.clojure": "clojure",
-    "application/x-latex": "latex",
-    "text/x-lua": "lua",
-    "text/x-script.powershell": "powershell",
-    "text/x-scala": "scala",
-    "text/x-coldfusion": "coldfusion",
-    "text/x-sql": "sql"
-};
+    coffee:     ["CoffeeScript" , "coffee|*Cakefile"],
+    coldfusion: ["ColdFusion"   , "cfm"],
+    csharp:     ["C#"           , "cs"],
+    css:        ["CSS"          , "css"],
+    golang:     ["Go"           , "go"],
+    groovy:     ["Groovy"       , "groovy"],
+    haxe:       ["haXe"         , "hx"],
+    html:       ["HTML"         , "htm|html|xhtml"],
+    c_cpp:      ["C/C++"        , "c|cc|cpp|cxx|h|hh|hpp"],
+    clojure:    ["Clojure"      , "clj"],
+    java:       ["Java"         , "java"],
+    javascript: ["JavaScript"   , "js"],
+    json:       ["JSON"         , "json"],
+    latex:      ["LaTeX"        , "latex|tex|ltx|bib"],
+    less:       ["LESS"         , "less"],
+    liquid:     ["Liquid"       , "liquid"],
+    lua:        ["Lua"          , "lua"],
+    markdown:   ["Markdown"     , "md|markdown"],
+    ocaml:      ["OCaml"        , "ml|mli"],
+    perl:       ["Perl"         , "pl|pm"],
+    pgsql:      ["pgSQL"        , "pgsql"],
+    php:        ["PHP"          , "php|phtml"],
+    powershell: ["Powershell"   , "ps1"],
+    python:     ["Python"       , "py"],
+    ruby:       ["Ruby"         , "ru|gemspec|rake|rb"],
+    scad:       ["OpenSCAD"     , "scad"                , "hidden"],
+    scala:      ["Scala"        , "scala"],
+    scss:       ["SCSS"         , "scss|sass"],
+    sh:         ["SH"           , "sh|bash|bat"],
+    sql:        ["SQL"          , "sql"],
+    svg:        ["SVG"          , "svg"],
+    text:       ["Text"         , "txt"                 , "hidden"],
+    textile:    ["Textile"      , "textile"],
+    xml:        ["XML"          , "xml|rdf|rss|wsdl|xslt|atom|mathml|mml|xul|xbl"],
+    xquery:     ["XQuery"       , "xq"],
+    yaml:       ["YAML"         , "yaml"]
+}
 
-var contentTypes = {
-    "js": "application/javascript",
-    "json": "application/json",
-    "css": "text/css",
-    "less": "text/css",
-    "scss": "text/x-scss",
-    "sass": "text/x-sass",
+var fileExtensions = {}, ModesCaption = {};
+Object.keys(SupportedModes).forEach(function(name) {
+    SupportedModes[name][1].split("|").forEach(function(ext) {
+        fileExtensions[ext] = name;
+    });
+    ModesCaption[SupportedModes[name][0]] = name;
+});
 
-    "xml": "application/xml",
-    "rdf": "application/rdf+xml",
-    "rss": "application/rss+xml",
-    "svg": "image/svg+xml",
-    "wsdl": "application/wsdl+xml",
-    "xslt": "application/xslt+xml",
-    "atom": "application/atom+xml",
-    "mathml": "application/mathml+xml",
-    "mml": "application/mathml+xml",
-
-    "php": "application/x-httpd-php",
-    "phtml": "application/x-httpd-php",
-    "html": "text/html",
-    "xhtml": "application/xhtml+xml",
-    "coffee": "text/x-script.coffeescript",
-    "*Cakefile": "text/x-script.coffeescript",
-    "py": "text/x-script.python",
-
-    "ru": "text/x-script.ruby",
-    "gemspec": "text/x-script.ruby",
-    "rake": "text/x-script.ruby",
-    "rb": "text/x-script.ruby",
-
-    "c": "text/x-c",
-    "cc": "text/x-c",
-    "cpp": "text/x-c",
-    "cxx": "text/x-c",
-    "h": "text/x-c",
-    "hh": "text/x-c",
-    "hpp": "text/x-c",
-
-    "cs": "text/x-csharp",
-
-    "java": "text/x-java-source",
-    "clj": "text/x-script.clojure",
-    "groovy": "text/x-groovy",
-    "scala": "text/x-scala",
-
-    "ml": "text/x-script.ocaml",
-    "mli": "text/x-script.ocaml",
-
-    "md": "text/x-markdown",
-    "markdown": "text/x-markdown",
-    "textile": "text/x-web-textile",
-    "latex": "application/x-latex",
-    "tex": "application/x-latex",
-    "ltx": "application/x-latex",
-
-    "lua": "text/x-lua",
-
-    "pl": "text/x-script.perl",
-    "pm": "text/x-script.perl-module",
-
-    "ps1": "text/x-script.powershell",
-    "cfm": "text/x-coldfusion",
-    "sql": "text/x-sql",
-
-    "sh": "application/x-sh",
-    "bash": "application/x-sh"
-};
+Object.keys(contentTypes).forEach(function(mime) {
+    var ext = contentTypes[mime];
+    var mode = fileExtensions[ext];
+    if (SupportedModes[mode][1].indexOf(ext) == 0)
+        SupportedModes[mode].mime = mime;
+});
 
 module.exports = ext.register("ext/code/code", {
     name    : "Code Editor",
@@ -183,8 +143,8 @@ module.exports = ext.register("ext/code/code", {
     nodes : [],
     menus : [],
 
-    fileExtensions : Object.keys(contentTypes),
-    supportedModes : Object.keys(SupportedModes),
+   fileExtensions : Object.keys(fileExtensions),
+   supportedModes : Object.keys(SupportedModes),
 
     getState : function(doc) {
         doc = doc ? doc.acesession : this.getDocument();
@@ -242,23 +202,61 @@ module.exports = ext.register("ext/code/code", {
         if (!node)
             return "";
 
-        var mime = node.getAttribute("customtype");
+        var mode = node.getAttribute("customtype");
 
-        if (!mime) {
+        if (mode) {
+            var ext = contentTypes[mode.split(";")[0]] ;
+            if (ext)
+                mode = fileExtensions[contentTypes[mode]];
+        }
+        
+        if (!mode) {
             var fileName = node.getAttribute("name");
-
-            if (fileName.lastIndexOf(".") != -1)
-                mime = contentTypes[fileName.split(".").pop().toLowerCase()];
-            else
-                mime = contentTypes["*" + fileName];
+            var dotI = fileName.lastIndexOf(".") + 1;
+            var ext = dotI ? fileName.substr(dotI).toLowerCase() : "*" + fileName;
+            mode = fileExtensions[ext];
         }
 
-        if (mime) {
-            mime = mime.split(";")[0];
-            return (SupportedModes[mime] || "text");
+        return SupportedModes[mode] ? mode : "text";
+    },
+    
+    setSyntax : function(value) {
+        value = SupportedModes[value] ? value : "auto";
+        var file = ide.getActivePageModel();
+        if (!file)
+            return;
+   
+        var fileName = file.getAttribute("name");  
+        var dotI = fileName.lastIndexOf(".") + 1;
+        var ext = dotI ? fileName.substr(dotI).toLowerCase() : "*" + fileName;
+        if (value == "auto") {
+            apf.xmldb.removeAttribute(file, "customtype", "");
+            
+            delete fileExtensions[ext];
+            for (var mode in SupportedModes) {
+                if (SupportedModes[mode][1].split("|").indexOf(ext) != -1) {
+                    fileExtensions[ext] = mode;
+                    break;
+                }
+            }
+        } else {
+            if (!SupportedModes[value])
+                return;
+
+            apf.xmldb.setAttribute(file, "customtype", value);
+            fileExtensions[ext] = value;
+            this.setCustomType(dotI ? ext : file, value);
+            
+            ide.dispatchEvent("track_action", {
+                type: "syntax highlighting",
+                fileType: ext,
+                fileName: fileName,
+                customType: value
+            });
         }
 
-        return "text";
+        if (self.ceEditor)
+            ceEditor.setAttribute("syntax", this.getSyntax(file));
     },
     
     getContentType : function(node) {
@@ -266,7 +264,7 @@ module.exports = ext.register("ext/code/code", {
         if (!syntax)
             return "auto";
         
-        return contentTypes[syntax] || (syntax == "text" ? "text/plain" : "auto");
+        return SupportedModes[syntax].mime || "auto";
     },
 
     getSelection : function(){
@@ -423,6 +421,17 @@ module.exports = ext.register("ext/code/code", {
 
         commands.addCommands(defaultCommands, true);
         commands.addCommands(MultiSelectCommands, true);
+
+        commands.addCommand({
+            name: "syntax",
+            exec: function(_, syntax) {
+                if (typeof syntax == "object")
+                    syntax = syntax.argv && syntax.argv[1] || "";
+                syntax = ModesCaption[syntax] || fileExtensions[syntax] || syntax;
+                _self.setSyntax(syntax);
+            },
+            commands: ModesCaption
+        });
 
         //Settings Support
         ide.addEventListener("settings.load", function(e) {
@@ -624,47 +633,7 @@ module.exports = ext.register("ext/code/code", {
                     }
                 },
                 "onitemclick" : function(e) {
-                    var file = ide.getActivePageModel();
-
-                    if (file) {
-                        var value = e.relatedNode.value;
-
-                        if (value == "auto")
-                            apf.xmldb.removeAttribute(file, "customtype", "");
-                        else
-                            apf.xmldb.setAttribute(file, "customtype", value);
-
-                        if (file.getAttribute("customtype")) {
-                            var fileName = file.getAttribute("name");
-
-                            if (contentTypes["*" + fileName])
-                                delete contentTypes["*" + fileName];
-
-                            var mime = value.split(";")[0];
-                            var fileExt = (fileName.lastIndexOf(".") != -1) ?
-                                fileName.split(".").pop() : null;
-
-                            if (fileExt && contentTypes[fileExt] !== mime)
-                                delete contentTypes[fileExt];
-
-                            var customType = fileExt ?
-                                contentTypes[fileExt] : contentTypes["*" + fileName];
-
-                            if (!customType)
-                                _self.setCustomType(fileExt ? fileExt : file, mime);
-
-                            ide.dispatchEvent("track_action", {
-                                type: "syntax highlighting",
-                                fileType: fileExt,
-                                fileName: fileName,
-                                mime: mime,
-                                customType: customType
-                            });
-                        }
-
-                        if (self.ceEditor)
-                            ceEditor.setAttribute("syntax", _self.getSyntax(file));
-                    }
+                    _self.setSyntax(e.relatedNode.value);
                 }
             }), 300000),
 
@@ -750,6 +719,8 @@ module.exports = ext.register("ext/code/code", {
         );
 
         for (var mode in ModesCaption) {
+            if (ModesCaption[mode][3] == "hidden")
+                continue;
             this.menus.push(
                 menus.addItemByPath("View/Syntax/" + mode, new apf.item({
                     type: "radio",
@@ -845,16 +816,16 @@ module.exports = ext.register("ext/code/code", {
      * Saves custom syntax for extension type in settings.xml
      *
      * @param {String|xmlNode} ext Contains the extension type shorthand
-     * @param {String} mime Mime type string the extension will be related to
+     * @param {String} mode ace mode the extension will be related to
      */
-    setCustomType: function(ext, mime) {
+    setCustomType: function(ext, mode) {
         var node;
 
         if (typeof ext === "string") {
             node = settings.model.queryNode('auto/customtypes/mime[@ext="' + ext + '"]');
             if (!node)
                 node = settings.model.appendXml('<mime name="'
-                    + mime + '" ext="' + ext + '" />', "auto/customtypes");
+                    + mode + '" ext="' + ext + '" />', "auto/customtypes");
         } else {
             var name = ext.getAttribute("name") || "";
             node = settings.model.queryNode('auto/customtypes/mime[@filename="' + name + '"]');
@@ -862,10 +833,10 @@ module.exports = ext.register("ext/code/code", {
                 apf.xmldb.removeAttribute(node, "ext");
             else
                 node = settings.model.appendXml('<mime name="'
-                    + mime + '" filename="' + name + '" />', "auto/customtypes");
+                    + mode + '" filename="' + name + '" />', "auto/customtypes");
         }
 
-        apf.xmldb.setAttribute(node, "name", mime);
+        apf.xmldb.setAttribute(node, "name", mode);
         settings.save();
     },
 
@@ -881,10 +852,13 @@ module.exports = ext.register("ext/code/code", {
 
         var mimes = customTypes.selectNodes("mime");
         mimes.forEach(function(n) {
-            if (n.getAttribute("filename"))
-                contentTypes["*" + n.getAttribute("filename")] = n.getAttribute("name");
-            else
-                contentTypes[n.getAttribute("ext")] = n.getAttribute("name");
+            var ext = n.getAttribute("filename")
+            ext = ext ? "*" + ext : n.getAttribute("ext");
+            var mode = n.getAttribute("name");
+            // old settings contained contenttype instead of mode
+            if (contentTypes[mode])
+                mode = contentTypes[mode];
+            fileExtensions[ext] = mode;
         });
     },
 

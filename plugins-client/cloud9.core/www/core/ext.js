@@ -261,7 +261,7 @@ module.exports = ext = {
                 c9console.write('"' + cmd + '" command executed', data);
         }
 
-        var res = commands.exec(cmd, null, data);
+        var res = commands.exec(cmd, ceEditor, data);
         return res === undefined ? false : res;
     }
 };
