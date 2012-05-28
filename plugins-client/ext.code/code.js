@@ -221,7 +221,7 @@ module.exports = ext.register("ext/code/code", {
     },
     
     setSyntax : function(value) {
-        value = SupportedModes[value] ? value : "auto";
+        value = SupportedModes[value] ? value : "";
         var file = ide.getActivePageModel();
         if (!file)
             return;
@@ -229,7 +229,13 @@ module.exports = ext.register("ext/code/code", {
         var fileName = file.getAttribute("name");  
         var dotI = fileName.lastIndexOf(".") + 1;
         var ext = dotI ? fileName.substr(dotI).toLowerCase() : "*" + fileName;
-        if (value == "auto") {
+        if (value) {
+            if (!SupportedModes[value])
+                return;
+
+            apf.xmldb.setAttribute(file, "customtype", value);
+            fileExtensions[ext] = value;
+        } else {
             apf.xmldb.removeAttribute(file, "customtype", "");
             
             delete fileExtensions[ext];
@@ -239,22 +245,15 @@ module.exports = ext.register("ext/code/code", {
                     break;
                 }
             }
-        } else {
-            if (!SupportedModes[value])
-                return;
-
-            apf.xmldb.setAttribute(file, "customtype", value);
-            fileExtensions[ext] = value;
-            this.setCustomType(dotI ? ext : file, value);
-            
-            ide.dispatchEvent("track_action", {
-                type: "syntax highlighting",
-                fileType: ext,
-                fileName: fileName,
-                customType: value
-            });
         }
 
+        this.setCustomType(dotI ? ext : file, value);
+        ide.dispatchEvent("track_action", {
+            type: "syntax highlighting",
+            fileType: ext,
+            fileName: fileName,
+            customType: value
+        });
         if (self.ceEditor)
             ceEditor.setAttribute("syntax", this.getSyntax(file));
     },
@@ -823,20 +822,20 @@ module.exports = ext.register("ext/code/code", {
 
         if (typeof ext === "string") {
             node = settings.model.queryNode('auto/customtypes/mime[@ext="' + ext + '"]');
-            if (!node)
-                node = settings.model.appendXml('<mime name="'
-                    + mode + '" ext="' + ext + '" />', "auto/customtypes");
+            if (!node && mode)
+                node = settings.model.appendXml('<mime ext="' + ext + '" />', "auto/customtypes");
         } else {
             var name = ext.getAttribute("name") || "";
             node = settings.model.queryNode('auto/customtypes/mime[@filename="' + name + '"]');
             if (node)
                 apf.xmldb.removeAttribute(node, "ext");
-            else
-                node = settings.model.appendXml('<mime name="'
-                    + mode + '" filename="' + name + '" />', "auto/customtypes");
+            else if (mode)
+                node = settings.model.appendXml('<mime filename="' + name + '" />', "auto/customtypes");
         }
-
-        apf.xmldb.setAttribute(node, "name", mode);
+        if (mode)
+            apf.xmldb.setAttribute(node, "name", mode);
+        else if (node)
+            apf.xmldb.removeNode(node);
         settings.save();
     },
 
@@ -858,7 +857,8 @@ module.exports = ext.register("ext/code/code", {
             // old settings contained contenttype instead of mode
             if (contentTypes[mode])
                 mode = contentTypes[mode];
-            fileExtensions[ext] = mode;
+            if (SupportedModes[mode])
+                fileExtensions[ext] = mode;
         });
     },
 
