@@ -39,99 +39,59 @@ apf.actiontracker.actions.aceupdate = function(undoObj, undo){
 };
 
 
-var contentTypes = {
-    "application/atom+xml":         "atom",
-    "application/javascript":       "js",
-    "application/json":             "json",
-    "application/mathml+xml":       "mml",
-    "application/rdf+xml":          "rdf",
-    "application/rss+xml":          "rss",
-    "application/wsdl+xml":         "wsdl",
-    "application/x-httpd-php":      "phtml",
-    "application/x-latex":          "ltx",
-    "application/x-sh":             "sh",
-    "application/xhtml+xml":        "xhtml",
-    "application/xml":              "xml",
-    "application/xslt+xml":         "xslt",
-    "image/svg+xml":                "svg",
-    "text/css":                     "less",
-    "text/html":                    "html",
-    "text/plain":                   "txt",
-    "text/x-c":                     "c",
-    "text/x-coldfusion":            "cfm",
-    "text/x-csharp":                "cs",
-    "text/x-groovy":                "groovy",
-    "text/x-java-source":           "java",
-    "text/x-lua":                   "lua",
-    "text/x-markdown":              "md",
-    "text/x-sass":                  "sass",
-    "text/x-scala":                 "scala",
-    "text/x-script.clojure":        "clj",
-    "text/x-script.coffeescript":   "coffee",
-    "text/x-script.ocaml":          "ml",
-    "text/x-script.perl":           "pl",
-    "text/x-script.perl-module":    "pm",
-    "text/x-script.powershell":     "ps1",
-    "text/x-script.python":         "py",
-    "text/x-script.ruby":           "rb",
-    "text/x-scss":                  "scss",
-    "text/x-sql":                   "sql",
-    "text/x-web-textile":           "textile"
+SupportedModes = {
+    coffee: ["CoffeeScript", "coffee|*Cakefile", "text/x-script.coffeescript"],
+    coldfusion: ["ColdFusion", "cfm", "text/x-coldfusion"],
+    csharp: ["C#", "cs", "text/x-csharp"],
+    css: ["CSS", "css", "text/css"],
+    golang: ["Go", "go", "text/x-go"],
+    groovy: ["Groovy", "groovy", "text/x-groovy"],
+    haxe: ["haXe", "hx", "text/haxe"],
+    html: ["HTML", "htm|html|xhtml", "text/html"],
+    c_cpp: ["C/C++", "c|cc|cpp|cxx|h|hh|hpp", "text/x-c"],
+    clojure: ["Clojure", "clj", "text/x-script.clojure"],
+    java: ["Java", "java", "text/x-java-source"],
+    javascript: ["JavaScript", "js", "application/javascript"],
+    json: ["JSON", "json", "application/json"],
+    latex: ["LaTeX", "latex|tex|ltx|bib", "application/x-latex"],
+    less: ["LESS", "less", "text/x-less"],
+    liquid: ["Liquid", "liquid", "text/x-liquid"],
+    lua: ["Lua", "lua", "text/x-lua"],
+    markdown: ["Markdown", "md|markdown", "text/x-markdown"],
+    ocaml: ["OCaml", "ml|mli", "text/x-script.ocaml"],
+    perl: ["Perl", "pl|pm", "text/x-script.perl"],
+    pgsql: ["pgSQL", "pgsql", "text/x-pgsql"],
+    php: ["PHP", "php|phtml", "application/x-httpd-php"],
+    powershell: ["Powershell", "ps1", "text/x-script.powershell"],
+    python: ["Python", "py", "text/x-script.python"],
+    ruby: ["Ruby", "ru|gemspec|rake|rb", "text/x-script.ruby"],
+    scad: ["OpenSCAD", "scad", "text/x-scad", "hidden"],
+    scala: ["Scala", "scala", "text/x-scala"],
+    scss: ["SCSS", "scss|sass", "text/x-scss"],
+    sh: ["SH", "sh|bash|bat", "application/x-sh"],
+    sql: ["SQL", "sql", "text/x-sql"],
+    svg: ["SVG", "svg", "image/svg+xml"],
+    text: ["Text", "txt", "text/plain", "hidden"],
+    textile: ["Textile", "textile", "text/x-web-textile"],
+    xml: ["XML", "xml|rdf|rss|wsdl|xslt|atom|mathml|mml|xul|xbl", "application/xml"],
+    xquery: ["XQuery", "xq", "text/x-xquery"],
+    yaml: ["YAML", "yaml", "text/x-yaml"]
 }
 
-var SupportedModes = {
-    coffee:     ["CoffeeScript" , "coffee|*Cakefile"],
-    coldfusion: ["ColdFusion"   , "cfm"],
-    csharp:     ["C#"           , "cs"],
-    css:        ["CSS"          , "css"],
-    golang:     ["Go"           , "go"],
-    groovy:     ["Groovy"       , "groovy"],
-    haxe:       ["haXe"         , "hx"],
-    html:       ["HTML"         , "htm|html|xhtml"],
-    c_cpp:      ["C/C++"        , "c|cc|cpp|cxx|h|hh|hpp"],
-    clojure:    ["Clojure"      , "clj"],
-    java:       ["Java"         , "java"],
-    javascript: ["JavaScript"   , "js"],
-    json:       ["JSON"         , "json"],
-    latex:      ["LaTeX"        , "latex|tex|ltx|bib"],
-    less:       ["LESS"         , "less"],
-    liquid:     ["Liquid"       , "liquid"],
-    lua:        ["Lua"          , "lua"],
-    markdown:   ["Markdown"     , "md|markdown"],
-    ocaml:      ["OCaml"        , "ml|mli"],
-    perl:       ["Perl"         , "pl|pm"],
-    pgsql:      ["pgSQL"        , "pgsql"],
-    php:        ["PHP"          , "php|phtml"],
-    powershell: ["Powershell"   , "ps1"],
-    python:     ["Python"       , "py"],
-    ruby:       ["Ruby"         , "ru|gemspec|rake|rb"],
-    scad:       ["OpenSCAD"     , "scad"                , "hidden"],
-    scala:      ["Scala"        , "scala"],
-    scss:       ["SCSS"         , "scss|sass"],
-    sh:         ["SH"           , "sh|bash|bat"],
-    sql:        ["SQL"          , "sql"],
-    svg:        ["SVG"          , "svg"],
-    text:       ["Text"         , "txt"                 , "hidden"],
-    textile:    ["Textile"      , "textile"],
-    xml:        ["XML"          , "xml|rdf|rss|wsdl|xslt|atom|mathml|mml|xul|xbl"],
-    xquery:     ["XQuery"       , "xq"],
-    yaml:       ["YAML"         , "yaml"]
-}
-
-var fileExtensions = {}, ModesCaption = {};
+var fileExtensions = {}, ModesCaption = {}, contentTypes = {};
 Object.keys(SupportedModes).forEach(function(name) {
-    SupportedModes[name][1].split("|").forEach(function(ext) {
+    var mode = SupportedModes[name];
+    mode.caption = mode[0];
+    mode.mime = mode[2];
+    mode.hidden = !!mode[3]
+    mode.ext = mode[1];
+    mode.ext.split("|").forEach(function(ext) {
         fileExtensions[ext] = name;
     });
-    ModesCaption[SupportedModes[name][0]] = name;
+    ModesCaption[mode.caption] = name;
+    contentTypes[mode.mime] = name;
 });
 
-Object.keys(contentTypes).forEach(function(mime) {
-    var ext = contentTypes[mime];
-    var mode = fileExtensions[ext];
-    if (SupportedModes[mode][1].indexOf(ext) == 0)
-        SupportedModes[mode].mime = mime;
-});
 
 module.exports = ext.register("ext/code/code", {
     name    : "Code Editor",
@@ -240,18 +200,19 @@ module.exports = ext.register("ext/code/code", {
             
             delete fileExtensions[ext];
             for (var mode in SupportedModes) {
-                if (SupportedModes[mode][1].split("|").indexOf(ext) != -1) {
+                if (SupportedModes[mode].ext.split("|").indexOf(ext) != -1) {
                     fileExtensions[ext] = mode;
                     break;
                 }
             }
         }
 
-        this.setCustomType(dotI ? ext : file, value);
+        var mime = this.setCustomType(dotI ? ext : file, value);
         ide.dispatchEvent("track_action", {
             type: "syntax highlighting",
             fileType: ext,
             fileName: fileName,
+            mime: mime,
             customType: value
         });
         if (self.ceEditor)
@@ -837,6 +798,7 @@ module.exports = ext.register("ext/code/code", {
         else if (node)
             apf.xmldb.removeNode(node);
         settings.save();
+        return mode && SupportedModes[mode].mime;
     },
 
     /**
