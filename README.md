@@ -36,7 +36,7 @@ We support the newer versions of Chrome, Firefox and Safari.
 
 Requirements:
 
-  * NodeJS `>= 0.6.15`
+  * NodeJS `>= 0.6.16`
   * NPM `>= 1.1.16`
 
 Install:
@@ -54,8 +54,10 @@ Install:
     git clone https://github.com/ajaxorg/cloud9.git cloud9
     cd cloud9
     sm install
+    
 
-This creates a `cloud9` directory in your current directory, just `cd` into it
+
+The above install steps create a `cloud9` directory in your current directory. Just `cd` into it
 and run `bin/cloud9.sh` to start:
 
     cd cloud9
@@ -130,8 +132,9 @@ Main projects that we use as building blocks:
 
   * [async.js] by [fjakobs]
   * [jsDAV] by [mikedeboer]
-  * [connect] by [senchalabs](http://github,com/senchalabs)
-  * [socket.io] by [LearnBoost](http://github.com/LearnBoost)
+  * [connect] by [senchalabs](http://github.com/senchalabs)
+  * [engine.io] by [LearnBoost](http://github.com/LearnBoost)
+  * [smith.io](http://github.com/c9/smith.io) by [creationix](http://github.com/creationix) & [cadorn](http://github.com/cadorn)
   * [ace](http://github.com/ajaxorg/ace) by [fjakobs]
   * [apf](http://www.ajax.org) by [ajax.org]
   * and of course [Node.JS]!
@@ -145,7 +148,7 @@ Thanks to all developers and contributors of these projects!
 [async.js]: http://github.com/fjakobs/async.js
 [jsDAV]: http://github.com/mikedeboer/jsdav
 [connect]: http://github.com/senchalabs/connect
-[socket.io]: http://github.com/LearnBoost/Socket.IO-node.git
+[engine.io]: http://github.com/LearnBoost/engine.io
 [requireJS]: http://requirejs.org/
 [Node.JS]: http://nodejs.org/
 

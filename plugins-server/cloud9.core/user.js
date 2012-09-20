@@ -6,11 +6,13 @@ var User = module.exports = function (uid, permissions, data) {
     EventEmitter.call(this);
 
     this.uid = uid;
-    this.permissions = permissions;
     this.data = data;
     this.clients = [];
     this.last_message_time = new Date().getTime();
-    this.$server_exclude = {};
+    this.permissions = permissions || User.VISITOR_PERMISSIONS;
+    this.$server_exclude = this.permissions.server_exclude
+        ? c9util.arrayToMap(this.permissions.server_exclude.split("|"))
+        : {};
 };
 
 util.inherits(User, EventEmitter);
@@ -55,7 +57,8 @@ User.VISITOR_PERMISSIONS = {
 (function() {
 
     this.setPermissions = function(permissions) {
-        this.$server_exclude = c9util.arrayToMap(permissions.server_exclude.split("|"));
+        if (permissions && permissions.server_exclude)
+            this.$server_exclude = c9util.arrayToMap(permissions.server_exclude.split("|"));
         if (this.permissions === permissions)
             return;
 
@@ -63,7 +66,7 @@ User.VISITOR_PERMISSIONS = {
         this.emit("changePermissions", this);
     };
 
-    this.getPermissions = function(permissions) {
+    this.getPermissions = function() {
         return this.permissions;
     };
 
@@ -95,9 +98,7 @@ User.VISITOR_PERMISSIONS = {
     };
 
     this.disconnectClients = function() {
-        console.log("disconnecting all connected clients");
-        for (var i = this.clients.length - 1; i >= 0; --i)
-            this.clients[i].disconnect();
+        this.clients = [];
     };
 
     this.onClientMessage = function(message, client) {
@@ -138,7 +139,7 @@ User.VISITOR_PERMISSIONS = {
 
         // pass a lambda to enable socket.io ACK
         if (client)
-            client.send(JSON.stringify(error), function() {});
+            client.send(error, function() {});
         else
             this.broadcast(error);
     };

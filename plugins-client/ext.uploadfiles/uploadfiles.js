@@ -32,10 +32,11 @@ module.exports = ext.register("ext/uploadfiles/uploadfiles", {
         "media-path" : ide.staticPrefix + "/ext/uploadfiles/style/images/"
     },
     type        : ext.GENERAL,
-    css         : css,
+    css         : util.replaceStaticPrefix(css),
     markup      : markup,
     deps        : [],
     offline     : false,
+    autodisable     : ext.ONLINE | ext.LOCAL,
     worker      : null,
     
     currentSettings : [],
@@ -117,6 +118,7 @@ module.exports = ext.register("ext/uploadfiles/uploadfiles", {
         function handleFileSelect(e){
             var files = e.target.files;
             _self.startUpload(files);
+            e.target.value = "";
         };
         
         ide.addEventListener("init.ext/tree/tree", function(){
@@ -150,7 +152,7 @@ module.exports = ext.register("ext/uploadfiles/uploadfiles", {
     initWorker: function() {
         var _self = this;
         
-        this.worker = new Worker('/static/ext/uploadfiles/uploadworker.js');
+        this.worker = new Worker(ide.workerPrefix + '/ext/uploadfiles/uploadworker.js');
         this.worker.onmessage = function(e) {  
             var data = e.data;
             if (!data.type) {
@@ -451,7 +453,7 @@ module.exports = ext.register("ext/uploadfiles/uploadfiles", {
     
     uploadNextFile: function() {
         if (this.cancelAllUploads)
-            return;
+            return this.uploadCanceled();
         
         var _self = this;
         uploadactivityNumFiles.$ext.innerHTML = "(" + this.totalNumUploads + ")";
@@ -474,7 +476,7 @@ module.exports = ext.register("ext/uploadfiles/uploadfiles", {
             }
         
             /** Chrome, Firefox */
-            if (apf.hasFileApi) {
+            if (window.File && window.FileReader && window.FileList && window.Blob) {
                 function checkFileExists(exists) {
                     if (exists) {
                         if (_self.existingOverwriteAll) {
@@ -552,6 +554,9 @@ module.exports = ext.register("ext/uploadfiles/uploadfiles", {
                     }
                     
                     function uploadNext(targetFolder) {
+                        if (_self.cancelAllUploads)
+                            return _self.uploadCanceled();
+                        
                         if (targetFolder)
                             file.targetFolder = targetFolder;
                         
@@ -629,7 +634,7 @@ module.exports = ext.register("ext/uploadfiles/uploadfiles", {
     
     onProgress: function(perc) {
         if (this.cancelAllUploads)
-            return;
+            return this.uploadCanceled();
             
         if(!this.currentFile) return;    
         var total = Math.floor(perc * 100);
@@ -639,10 +644,8 @@ module.exports = ext.register("ext/uploadfiles/uploadfiles", {
     },
     
     onComplete: function() {
-        if (this.cancelAllUploads) {
-            this.cancelAllUploads = false;
-            return;
-        }
+        if (this.cancelAllUploads)
+            return this.uploadCanceled();
         
         var _self = this;
         var file = this.currentFile;
@@ -654,7 +657,7 @@ module.exports = ext.register("ext/uploadfiles/uploadfiles", {
         
         if (_self.openOnUpload) {
             if (file.size < MAX_OPENFILE_SIZE)
-                ide.dispatchEvent("openfile", {doc: ide.createDocument(file.treeNode)});
+                ide.dispatchEvent("openfile", {doc: ide.createDocument(file.treeNode), origin: "upload"});
         }
         
         setTimeout(function() {
@@ -693,16 +696,27 @@ module.exports = ext.register("ext/uploadfiles/uploadfiles", {
     
     cancelAll: function() {
         this.cancelAllUploads = true;
-        this.worker.postMessage({cmd: 'cancelall'});
+        if (this.worker) // worker might not be initialized yet when canceling before first upload
+            this.worker.postMessage({cmd: 'cancelall'});
         this.uploadFiles = [];
         this.uploadQueue = [];
         
-        mdlUploadActivity.clear();
+        mdlUploadActivity.load("<data />");
         boxUploadActivity.hide();
         
         (davProject.realWebdav || davProject).setAttribute("showhidden", settings.model.queryValue("auto/projecttree/@showhidden"));
         if (this.currentFile.treeNode)
             apf.xmldb.removeNode(this.currentFile.treeNode);
+    },
+    
+    uploadCanceled: function() {
+        this.uploadInProgress = false;
+        this.cancelAllUploads = false;
+        this.existingOverwriteAll = false;
+        this.existingSkipAll = false;
+        this.totalNumUploads = 0;
+        (davProject.realWebdav || davProject).setAttribute("showhidden", settings.model.queryValue("auto/projecttree/@showhidden"));
+        require("ext/tree/tree").refresh();
     },
     
     getFormData: function(file) {

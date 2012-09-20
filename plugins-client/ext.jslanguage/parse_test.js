@@ -6,7 +6,7 @@ if (typeof process !== "undefined") {
 define(function(require, exports, module) {
 
 var assert = require("ace/test/assertions");
-//var handler = require('ext/jslanguage/narcissus_jshint');
+//var handler = require('ext/jslanguage/jshint');
 var LanguageWorker = require('ext/language/worker').LanguageWorker;
 var EventEmitter = require("ace/lib/event_emitter").EventEmitter;
 
@@ -20,6 +20,28 @@ module.exports = {
         worker.switchFile("test.js", "javascript", "hello();");
         worker.parse(function(ast) {
             assert.equal(ast, '[Call(Var("hello"),[])]');
+        });
+    },
+    "test basic recovery" : function() {
+        var emitter = Object.create(EventEmitter);
+        emitter.emit = emitter._dispatchEvent;
+        var worker = new LanguageWorker(emitter);
+        worker.register("ext/jslanguage/parse");
+        assert.equal(worker.handlers.length, 1);
+        worker.switchFile("test.js", "javascript", "hello(");
+        worker.parse(function(ast) {
+            assert.equal(ast, '[Call(Var("hello"),[])]');
+        });
+    },
+    "test follow by whitespace" : function() {
+        var emitter = Object.create(EventEmitter);
+        emitter.emit = emitter._dispatchEvent;
+        var worker = new LanguageWorker(emitter);
+        worker.register("ext/jslanguage/parse");
+        assert.equal(worker.handlers.length, 1);
+        worker.switchFile("test.js", "javascript", "console.log\n\n\n\n");
+        worker.parse(function(ast) {
+            assert.equal(ast, '[PropAccess(Var("console"),"log")]');
         });
     }
 };

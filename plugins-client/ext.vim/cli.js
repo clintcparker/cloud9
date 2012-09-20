@@ -8,19 +8,22 @@
 
 define(function(require, exports, module) {
 
-var save;
-var cmds = module.exports = {
-    w: function(editor, data) {
-        if (!save)
-            save = require("ext/save/save");
+var filesystem = require("ext/filesystem/filesystem");
+var gotofile = require("ext/gotofile/gotofile");
+var editors = require("ext/editors/editors");
+var save = require("ext/save/save");
+var ide = require("core/ide");
 
+
+var cliCmds = exports.cliCmds = {
+    w: function(editor, data) {
         var page = tabEditors.getPage();
         if (!page)
             return;
 
         var lines = editor.session.getLength();
         if (data.argv.length === 2) {
-            var path = ("/workspace/" + data.argv[1]).replace(/\/+/, "/");
+            var path = (ide.davPrefix + "/" + data.argv[1]).replace(/\/+/, "/");
             page.$model.data.setAttribute("path", path);
 
             save.saveas(page, function() {
@@ -32,10 +35,153 @@ var cmds = module.exports = {
                 console.log(page.name + " " + lines +"L, ##C written");
             });
         }
+    },
+    e: function(editor, data) {
+        var path = data.argv[1];
+        if (!path) {
+            gotofile.toggleDialog(1);
+            return false;
+        }
+        else {
+            path = (ide.davPrefix + "/" + path).replace(/\/+/, "/");
+            filesystem.exists(path, function(exists){
+                if (exists) {
+                    editors.gotoDocument({path: path});
+                }
+                else {
+                    var node = filesystem.createFileNodeFromPath(path);
+                    node.setAttribute("newfile", "1");
+                    node.setAttribute("changed", "1");
+                    node.setAttribute("cli", "1"); // blocks Save As dialog
+
+                    var doc = ide.createDocument(node);
+                    doc.cachedValue = "";
+
+                    editors.gotoDocument({
+                        doc: doc,
+                        type: "newfile",
+                        origin: "newfile"
+                    });
+                }
+            });
+        }
+    },
+    x: function(editor, data) {
+        var page = tabEditors.getPage();
+        if (!page)
+            return;
+        if (page.$doc.getNode().getAttribute("changed"))
+            cliCmds.w(editor, data);
+        cliCmds.q();
+    },
+    wq: function(editor, data) {
+        cliCmds.w(editor, data);
+        cliCmds.q();
+    },
+    q: function(editor, data) {
+        var page = tabEditors.getPage();
+        var corrected = ide.dispatchEvent("beforeclosetab", {
+            page: page
+        });
+        if (corrected)
+            page = corrected;
+        if (data && data.force) {
+            var at = page.$at;
+            at.undo_ptr = at.$undostack[at.$undostack.length-1];
+            page.$doc.getNode().removeAttribute("changed");
+        }
+        editors.close(page);
+    },
+    "q!": function() {
+        cliCmds.q(null, {force: true})
     }
 };
 
 // aliases
-cmds.write = cmds.w;
+cliCmds.write = cliCmds.w;
+
+exports.searchStore = {
+    current: "",
+    options: {
+        needle: "",
+        backwards: false,
+        wrap: true,
+        caseSensitive: false,
+        wholeWord: false,
+        regExp: false
+    }
+};
+
+exports.focusCommandLine = function(val) {
+    txtConsoleInput.$editor.setValue(val, 1);
+    setTimeout(function() { txtConsoleInput.focus(); });
+}
+
+exports.actions = {
+    ":": {
+        fn: function(editor, range, count, param) {
+           exports.focusCommandLine(":");
+        }
+    },
+    "/": {
+        fn: function(editor, range, count, param) {
+            exports.focusCommandLine("/");
+        }
+    },
+    "?": {
+        fn: function(editor, range, count, param) {
+            exports.focusCommandLine("?");
+        }
+    }
+};
+
+exports.addCommands = function(handler) {
+    var actions = handler.actions;
+    Object.keys(exports.actions).forEach(function(i){
+        actions[i] = exports.actions[i];
+    })
+}
+
+exports.onConsoleCommand = function(e) {
+    var cmd = e.data.command, success;
+    if ((typeof ceEditor !== "undefined") && cmd && typeof cmd === "string") {
+        var ed = ceEditor.$editor;
+        if (cmd[0] === ":") {
+            cmd = cmd.substr(1);
+
+            if (cliCmds[cmd]) {
+                success = cliCmds[cmd](ed, e.data);
+            }
+            else if (cmd.match(/^\d+$/)) {
+                ed.gotoLine(cmd, 0);
+                ed.navigateLineStart();
+            }
+            else {
+                console.log("Vim command '" + cmd + "' not implemented.");
+            }
+
+            e.returnValue = false;
+        }
+        else if (cmd[0] === "/" || cmd[0] === "?") {
+            var options = exports.searchStore.options;
+            options.backwards = cmd[0] === "?";
+            cmd = cmd.substr(1);
+            if (cmd)
+                exports.searchStore.current = cmd;
+            else
+                cmd = exports.searchStore.current;
+            ed.find(cmd, options);
+            setTimeout(function(){ ed.focus(); });
+            e.returnValue = false;
+        }
+        // something blocks focusing without timeout
+        if (success !== false) {
+            setTimeout(function(){ 
+                if (apf.activeElement == txtConsoleInput)
+                    ceEditor.focus();
+            });
+        }
+    }
+};
 
 });

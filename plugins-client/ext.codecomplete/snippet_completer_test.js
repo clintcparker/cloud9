@@ -20,7 +20,7 @@ function matchSorter(matches) {
     });
 }
 
-completer.fetchText = function(path) {
+completer.fetchText = function(staticPrefix, path) {
     return require('fs').readFileSync(__dirname + "/../" + path.replace("ext/", "ext."), 'ascii');
 };
 

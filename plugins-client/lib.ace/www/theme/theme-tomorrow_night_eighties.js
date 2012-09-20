@@ -35,7 +35,7 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-define('ace/theme/tomorrow_night_eighties',function(require, exports, module) {
+define('ace/theme/tomorrow_night_eighties', ['require', 'exports', 'module', 'ace/lib/dom'], function(require, exports, module) {
 
 exports.isDark = true;
 exports.cssClass = "ace-tomorrow-night-eighties";
@@ -49,13 +49,13 @@ exports.cssText = "\
 }\
 \
 .ace-tomorrow-night-eighties .ace_gutter {\
-  background: #e8e8e8;\
-  color: #333;\
+  background: #272727;\
+  color: #CCC;\
 }\
 \
 .ace-tomorrow-night-eighties .ace_print_margin {\
   width: 1px;\
-  background: #e8e8e8;\
+  background: #272727;\
 }\
 \
 .ace-tomorrow-night-eighties .ace_scroller {\
@@ -63,7 +63,6 @@ exports.cssText = "\
 }\
 \
 .ace-tomorrow-night-eighties .ace_text-layer {\
-  cursor: text;\
   color: #CCCCCC;\
 }\
 \
@@ -96,6 +95,10 @@ exports.cssText = "\
 \
 .ace-tomorrow-night-eighties .ace_marker-layer .ace_active_line {\
   background: #393939;\
+}\
+\
+.ace-tomorrow-night-eighties .ace_gutter_active_line {\
+  background-color: #393939;\
 }\
 \
 .ace-tomorrow-night-eighties .ace_marker-layer .ace_selected_word {\

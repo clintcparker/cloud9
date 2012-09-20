@@ -13,9 +13,9 @@ completer.handlesLanguage = function(language) {
     return true;
 };
 
-completer.fetchText = function(path) {
+completer.fetchText = function(staticPrefix, path) {
     var xhr = new XMLHttpRequest();
-    xhr.open('GET', "/static/" + path, false);
+    xhr.open('GET', staticPrefix + "/" + path, false);
     xhr.send();
     if(xhr.status === 200)
         return xhr.responseText;
@@ -32,7 +32,9 @@ completer.complete = function(doc, fullAst, pos, currentNode, callback) {
     var snippets = snippetCache[this.language];
     
     if (snippets === undefined) {
-        var text = this.fetchText('ext/codecomplete/snippets/' + this.language + '.json');
+        var text;
+        if (this.language)
+            text = this.fetchText(this.staticPrefix, 'ext/codecomplete/snippets/' + this.language + '.json');
         snippets = text ? JSON.parse(text) : {};
         // Cache
         snippetCache[this.language] = snippets;
@@ -45,6 +47,7 @@ completer.complete = function(doc, fullAst, pos, currentNode, callback) {
         return {
           name        : m,
           replaceText : snippets[m],
+          doc         : "<pre>" + snippets[m].replace("\^\^", "&#9251;") + "</pre>",
           icon        : null,
           meta        : "snippet",
           priority    : 2

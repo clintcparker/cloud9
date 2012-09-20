@@ -30,6 +30,8 @@ function wordDistanceAnalyzer(doc, pos, prefix) {
         if (i === prefixPosition)
             continue;
         var ident = identifiers[i];
+        if (ident.length === 0)
+            continue;
         var distance = Math.max(prefixPosition, i) - Math.min(prefixPosition, i);
         // Score substracted from 100000 to force descending ordering
         if (Object.prototype.hasOwnProperty.call(identDict, ident))
@@ -48,13 +50,6 @@ function analyze(doc, pos) {
     var analysisCache = wordDistanceAnalyzer(doc, pos, identifier);
     return analysisCache;
 }
-
-/**
- * Returns whether the completion engine requires an AST representation of the code
- */
-completer.completionRequiresParsing = function() {
-    return false;
-};
     
 completer.complete = function(doc, fullAst, pos, currentNode, callback) {
     var identDict = analyze(doc, pos);

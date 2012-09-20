@@ -7,28 +7,34 @@
                   icon     = "play.png"
                   command  = "resume"
                   skin     = "c9-sidepanelsbutton"
-                  disabled = "{!stDebugProcessRunning.active or stRunning.active}" />
+                  disabled = "{dbg.state != 'stopped'}" />
                 <a:button  tooltip="Suspend"
                   skin     = "c9-sidepanelsbutton"
                   icon     = "pause.png"
-                  onclick  = "dbg.suspend();"
-                  disabled = "{!stDebugProcessRunning.active or !stRunning.active}"/>
+                  onclick  = "require('ext/debugger/debugger').suspend();"
+                  disabled = "{dbg.state == 'stopped' or !dbg.state}"/>
                 <a:divider skin="c9-divider" />
                 <a:button id="btnStepOver" tooltip="Step Over"
                   icon     = "step.png"
                   skin     = "c9-sidepanelsbutton"
                   command  = "stepover"
-                  disabled = "{!stDebugProcessRunning.active or stRunning.active}" />
+                  disabled = "{dbg.state != 'stopped'}" />
                 <a:button id="btnStepInto" tooltip="Step Into"
                   icon     = "stepinto.png" 
                   skin     = "c9-sidepanelsbutton"
                   command  = "stepinto" 
-                  disabled = "{!stDebugProcessRunning.active or stRunning.active}" />
+                  disabled = "{dbg.state != 'stopped'}" />
                 <a:button id="btnStepOut" tooltip="Step Out"
                   icon     = "stepback.png" 
                   skin     = "c9-sidepanelsbutton"
                   command  = "stepout"
-                  disabled = "{!stDebugProcessRunning.active or stRunning.active}" />
+                  disabled = "{dbg.state != 'stopped'}" />
+                <a:divider skin="c9-divider" />
+                <!--<a:button id="btnStepThrough" tooltip="Step Through"
+                  icon     = "stepthrough.png" 
+                  skin     = "c9-sidepanelsbutton"
+                  command  = "stepout"
+                  disabled = "{dbg.state != 'stopped'}" />-->
             </a:hbox>
         </a:page>
     </a:tab>
@@ -43,7 +49,7 @@
               model      = "mdlDbgStack"
               class      = "noscrollbar"
               scrollbar  = "sbShared 20 2 2"
-              disabled   = "{!stDebugProcessRunning.active || stRunning.active}"
+              disabled   = "{dbg.state != 'stopped'}"
               selected   = "{dbg.activeframe}">
                 <a:actions />
                 <a:each match="[frame]">
@@ -58,7 +64,7 @@
             <a:toolbar>
                 <a:bar border="0 0 1 0">
                     <a:button
-                      disabled = "{!stDebugProcessRunning.active || stRunning.active}"
+                      disabled = "{!dbg.state}"
                       caption  = "Execute" 
                       tooltip  = "Ctrl+Enter"
                       onclick  = "
@@ -77,19 +83,19 @@
                       width      = "120"
                       maxitems   = "10"
                       model      = "mdlDbgSources"
-                      disabled   = "{!stDebugProcessRunning.active &amp;&amp; 1}" 
+                      disabled   = "{dbg.state == null}" 
                       each       = "[file]"
                       caption    = "[@text]"
                       autoselect = "false"
                       icon       = "debugger/file_obj.gif" />
                 </a:bar>
             </a:toolbar>
-            <a:vbox anchors="29 0 0 0" flex="1" splitters="true">
+            <a:vsplitbox anchors="29 0 0 0" splitter="true" class="topsplitter">
                 <a:codeeditor id="txtCode" 
-                  flex              = "1"
-                  disabled          = "{stRunning.active || !stDebugProcessRunning.active}"
+                  disabled          = "{!dbg.state}"
                   onkeydown         = "return require('ext/debugger/inspector').consoleTextHandler(event)" 
                   realtime          = "true"
+                  syntax            = "javascript"
                   border            = "0" 
                   model             = "{require('core/settings').model}" 
                   value             = "[auto/console/input]"
@@ -107,12 +113,12 @@
                   printmargincolumn = "0" />
                 <a:text id="txtInteractiveOutput"
                   class      = "interactive_output"
-                  flex       = "1"
+                  height     = "150"
                   scrolldown = "true"
                   focussable = "true"
                   textselect = "true" 
                   scrollbar  = "sbShared 20 2 2" />
-            </a:vbox>
+            </a:vsplitbox>
         </a:page>
         <a:page id="dbgVariable" caption="Variables" render="runtime">
             <a:datagrid id="dgVars"
@@ -124,7 +130,7 @@
               prerender  = "false"
               caching    = "false"
               model      = "[{dbg.activeframe}::vars]"
-              disabled   = "{!stDebugProcessRunning.active || stRunning.active}"
+              disabled   = "{dbg.state != 'stopped'}"
               loading-message = "Calculating...">
                 <a:actions />
                 <a:each match="[item|globals]" sort="[@name]">
@@ -150,6 +156,7 @@
               checked    = "[@enabled]">
                 <a:caption>
                     [@text]
+                    <a:remove match="[file|folder]" />
                     <div>[@content]</div>
                 </a:caption>
             </a:list>

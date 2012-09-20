@@ -7,14 +7,14 @@
 
 define(function(require, exports, module) {
 
-require("apf/elements/debugger");
-require("apf/elements/debughost");
-
 var ide = require("core/ide");
 var ext = require("core/ext");
 var settings = require("core/settings");
 var markup = require("text!ext/noderunner/noderunner.xml");
 var c9console = require("ext/console/console");
+var _debugger = require("ext/debugger/debugger");
+
+/*global stProcessRunning*/
 
 module.exports = ext.register("ext/noderunner/noderunner", {
     name    : "Node Runner",
@@ -22,26 +22,25 @@ module.exports = ext.register("ext/noderunner/noderunner", {
     type    : ext.GENERAL,
     alone   : true,
     offline : false,
+    autodisable : ext.ONLINE | ext.LOCAL,
     markup  : markup,
 
     NODE_VERSION: "auto",
 
-    init : function(){
+    init : function() {
         var _self = this;
-        ide.addEventListener("socketConnect", this.onConnect.bind(this));
-        ide.addEventListener("socketDisconnect", this.onDisconnect.bind(this));
+        if (ide.connected) {
+            this.queryServerState();
+            ide.addEventListener("socketDisconnect", function() {
+                ide.dispatchEvent("dbg.exit");
+            });
+        } else {
+            ide.addEventListener("socketConnect", function() {
+                _self.queryServerState();
+            });
+        }
+        
         ide.addEventListener("socketMessage", this.onMessage.bind(this));
-
-        dbg.addEventListener("break", function(e){
-            ide.dispatchEvent("break");
-        });
-
-        dbgNode.addEventListener("onsocketfind", function() {
-            return ide.socket;
-        });
-
-        stDebugProcessRunning.addEventListener("activate", this.$onDebugProcessActivate.bind(this));
-        stDebugProcessRunning.addEventListener("deactivate", this.$onDebugProcessDeactivate.bind(this));
 
         ide.addEventListener("consolecommand.run", function(e) {
             ide.send({
@@ -60,64 +59,48 @@ module.exports = ext.register("ext/noderunner/noderunner", {
         });
     },
 
-    $onDebugProcessActivate : function() {
-        dbg.attach(dbgNode, 0);
-    },
-
-    $onDebugProcessDeactivate : function() {
-        dbg.detach(function(){});
-    },
-
     onMessage : function(e) {
         var message = e.message;
-        //console.log("MSG", message)
+        //if (message.type != "shell-data")
+           // console.log("MSG", message)
+        var runners = window.cloud9config.runners;
+        var lang;
+        if ((lang = /^(\w+)-debug-ready$/.exec(message.type)) && runners.indexOf(lang[1]) >= 0) {
+            ide.dispatchEvent("dbg.ready", message);
+            return;
+        }
+        else if ((lang = /^(\w+)-exit$/.exec(message.type)) && runners.indexOf(lang[1]) >= 0) {
+            ide.dispatchEvent("dbg.exit", message);
+            if (message.pid == this.nodePid) {
+                stProcessRunning.deactivate();
+                this.nodePid = 0;
+            }
+            return;
+        }
 
         switch(message.type) {
-            case "node-debug-ready":
-                ide.dispatchEvent("debugready");
-                break;
-
-            case "chrome-debug-ready":
-                winTab.show();
-                dbgChrome.loadTabs();
-                ide.dispatchEvent("debugready");
-                break;
-
-            case "node-exit":
-                stProcessRunning.deactivate();
-                stDebugProcessRunning.deactivate();
-                break;
-
             case "state":
                 this.nodePid = message.processRunning || 0;
-
-                stDebugProcessRunning.setProperty("active", !!message.debugClient);
                 stProcessRunning.setProperty("active", !!message.processRunning);
 
-                dbgNode.setProperty("strip", message.workspaceDir + "/");
-                ide.dispatchEvent("noderunnerready");
+                ide.dispatchEvent("dbg.state", message);
                 break;
 
             case "error":
                 // child process already running
                 if (message.code == 1) {
-                    stDebugProcessRunning.setProperty("active", false);
                     stProcessRunning.setProperty("active", true);
-                    break;
                 }
                 // debug process already running
                 else if (message.code == 5) {
-                    stDebugProcessRunning.setProperty("active", true);
                     stProcessRunning.setProperty("active", true);
-                    break;
                 }
-
                 /*
                     6:
                     401: Authorization Required
                 */
                 // Command error
-                if (message.code === 9) {
+                else if (message.code === 9) {
                     c9console.log("<div class='item console_log' style='font-weight:bold;color:yellow'>"
                         + message.message + "</div>");
                 }
@@ -138,58 +121,45 @@ module.exports = ext.register("ext/noderunner/noderunner", {
                     });
                 }
 
-                ide.send({"command": "state", "action": "publish"});
+                this.queryServerState();
                 break;
         }
     },
 
-    onConnect : function() {
-        ide.send({"command": "state"});
-            
-        /**** START Moved from offline.js ****/
-        
+    queryServerState : function() {
         // load the state, which is quite a weird name actually, but it contains
         // info about the debugger. The response is handled by 'noderunner.js'
         // who publishes info for the UI of the debugging controls based on this.
-        ide.send({
-            command: "state",
-            action: "publish"
-        });
-
-        // the debugger needs to know that we are going to attach, but that its not a normal state message
-        dbg.registerAutoAttach();
-        
-        /**** END Moved from offline.js ****/
-    },
-
-    onDisconnect : function() {
-        stDebugProcessRunning.deactivate();
+        ide.send({command: "state", action: "publish" });
     },
 
     debug : function() {
-        this.$run(true);
     },
 
     run : function(path, args, debug, nodeVersion) {
-        // this is a manual action, so we'll tell that to the debugger
-        dbg.registerManualAttach();
-        if (stProcessRunning.active || !stServerConnected.active || typeof path != "string")
+        var runner;
+        if (stProcessRunning.active || typeof path != "string")
             return false;
-
-        stProcessRunning.activate()
-
-        if (nodeVersion == 'default')
-            nodeVersion = "";
+        // TODO there should be a way to set satate to waiting
+        stProcessRunning.activate();
 
         path = path.trim();
+
+        if (nodeVersion == 'default' || !nodeVersion) {
+            runner = this.detectRunner(path);
+            nodeVersion = runner == 'node' ? settings.model.queryValue("auto/node-version/@version") || this.NODE_VERSION : 'auto';
+        } else {
+            runner = nodeVersion.split(" ")[0];
+            nodeVersion = nodeVersion.split(" ")[1] || 'auto';
+        }
 
         var page = ide.getActivePageModel();
         var command = {
             "command" : apf.isTrue(debug) ? "RunDebugBrk" : "Run",
             "file"    : path.replace(/^\/+/, ""),
-            "runner"  : "node",
-            "args"    : args || "",
-            "version" : nodeVersion || settings.model.queryValue("auto/node-version/@version") || this.NODE_VERSION,
+            "runner"  : runner,
+            "args"    : args || [],
+            "version" : nodeVersion,
             "env"     : {
                 "C9_SELECTED_FILE": page ? page.getAttribute("path").slice(ide.davPrefix.length) : ""
             }
@@ -216,6 +186,19 @@ module.exports = ext.register("ext/noderunner/noderunner", {
     },
 
     destroy : function(){
+    },
+    
+    detectRunner: function(path) {
+        if (path.match(/\.(php|phtml)$/))
+            return "apache";
+        
+        if (path.match(/\.py$/))
+            return "python";
+        
+        if (path.match(/\.rb$/))
+            return "ruby";
+        
+        return "node";
     }
 });
 

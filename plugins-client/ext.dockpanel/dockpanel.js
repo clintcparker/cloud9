@@ -24,9 +24,12 @@ module.exports = ext.register("ext/dockpanel/dockpanel", {
     },
 
     nodes          : [],
-    dockpanels     : [],
+    dockpanels     : {},
     
     loaded : false,
+    
+    initDocTitle     : document.title,
+    notificationMsgs : {},
     
     /**
      * Standard Extension functionality
@@ -40,11 +43,14 @@ module.exports = ext.register("ext/dockpanel/dockpanel", {
             function(arrExtension){
                 if (!arrExtension || !_self.dockpanels[arrExtension[0]])
                     return false;
-
-                var item = _self.dockpanels[arrExtension[0]][arrExtension[1]];
+        
+                var item = _self.dockpanels[arrExtension[0]][arrExtension[1]];      
+                if (!item)
+                    return false;
+                    
                 if (item.page)
                     return item.page;
-
+                
                 var page = item.getPage();
                 
                 if (page)
@@ -74,7 +80,9 @@ module.exports = ext.register("ext/dockpanel/dockpanel", {
                 if (!arrExtension || !_self.dockpanels[arrExtension[0]])
                     return false;
 
-                return _self.dockpanels[arrExtension[0]][arrExtension[1]].options;
+                var item = _self.dockpanels[arrExtension[0]][arrExtension[1]];
+
+                return item && item.options;
             },
             //Change State Handler
             function(){
@@ -86,24 +94,24 @@ module.exports = ext.register("ext/dockpanel/dockpanel", {
             }
         );
 
-        //@todo was loadsettings
         ide.addEventListener("extload", function(e){
-            var model = settings.model;
-            var strSettings = model.queryValue("auto/dockpanel/text()");
-
-            var state = _self.defaultState;
-            if (strSettings) {
-                // JSON parse COULD fail
-                try {
-                    state = JSON.parse(strSettings);
+            ide.addEventListener("settings.load", function(e){
+                var model = settings.model;
+                var strSettings = model.queryValue("auto/dockpanel/text()");
+    
+                var state = _self.defaultState;
+                if (strSettings) {
+                    // JSON parse COULD fail
+                    try {
+                        state = JSON.parse(strSettings);
+                    }
+                    catch (ex) {}
                 }
-                catch (ex) {}
-            }
-            
-            ide.dispatchEvent("dockpanel.load.settings", {state: state});
-            
-            _self.layout.loadState(state);
-            _self.loaded = true;
+                
+                ide.dispatchEvent("dockpanel.load.settings", {state: state});
+                _self.layout.loadState(state);
+                _self.loaded = true;
+            });
         });
         
         this.nodes.push(
@@ -166,13 +174,12 @@ module.exports = ext.register("ext/dockpanel/dockpanel", {
         this.layout.clearState();
     },
 
-    register : function(name, type, options, getPage){
+    register : function(name, type, options, getPage){            
         var panel = this.dockpanels[name] || (this.dockpanels[name] = {});
         panel[type] = {
             options : options,
             getPage : getPage
         };
-
         var layout = this.layout, _self = this;
 
         panel[type].mnuItem = menus.addItemByPath(
@@ -198,7 +205,7 @@ module.exports = ext.register("ext/dockpanel/dockpanel", {
         
     },
 
-    addDockable : function(def){        
+    addDockable : function(def){   
         var state = this.defaultState;
             
         if (!def.barNum)
@@ -237,12 +244,36 @@ module.exports = ext.register("ext/dockpanel/dockpanel", {
         return bar.sections.slice(-1);
     }, //properties.forceShow ??
     
+    removeButton : function(name, type, state, removeItem){
+        var _self = this;
+        state = state || this.layout.getState(true);        
+        if(!state || !name || !type)
+            return;
+        
+        if(!state.bars)
+            state = state.state;
+            
+        state.bars.each(function(bar){
+            bar.sections.each(function(section){
+                for (var k = 0; k < section.buttons.length; k++) {
+                    var button = section.buttons[k];
+                    if (button.ext[0] == name && button.ext[1] == type) {
+                        if(removeItem)
+                            delete menus.items["View/Dock Panels/" + button.caption];
+                        section.buttons.remove(button);
+                        delete _self.dockpanels[name][type];
+                    }
+                }
+            });
+        });
+    },
+    
     getButtons : function(name, type, state){
         state = state || this.layout.getState(true);
         var list  = [];
         
         if(!state)
-            return;
+            return list;
         
         if(!state.bars)
             state = state.state;
@@ -400,15 +431,102 @@ module.exports = ext.register("ext/dockpanel/dockpanel", {
     /**
      * Updates the notification element to visually reflect notCount
      */
-    updateNotificationElement: function(btnObj, count){
+    updateNotificationElement: function(btnObj, count, options){
+        if (!btnObj) {
+            return console.trace("dockpanel.updateNotificationElement requires btnObj not to be null");
+        }
+        
         var countInner = count === 0 ? "" : count;
-
+        var notificationEl = btnObj.$ext.getElementsByClassName("dock_notification")[0];
+        
+        if(!options)
+            options = {};
+        
+        var notificationType = options.type || "";
+        
         if (apf.isGecko)
-            btnObj.$ext.getElementsByClassName("dock_notification")[0].textContent = countInner;
+            notificationEl.textContent = countInner;
         else
-            btnObj.$ext.getElementsByClassName("dock_notification")[0].innerText = countInner;
+            notificationEl.innerText = countInner;
+        
+        if (count > 0)
+            notificationEl.style.display = "block";
+        else
+            notificationEl.style.display = "none";
+        
+        var btnPage = btnObj.$dockpage;
+        if(!btnPage.initCaption)
+            btnPage.initCaption = btnPage.getAttribute("caption");
+            
+        var caption = btnPage.initCaption;
+
+        if(!btnPage.$active) {
+            if (count > 0) {
+                caption += " (" + count + ")";
+                apf.setStyleClass(btnPage.$button, "un-read-message");
+                if(notificationType == "chat") {
+                    btnObj.notificationOpt = options
+                    if (options.name) {
+                        this.notificationMsgs[options.name] = count;
+                        this.updateDocTitleNotifications();
+                    }
+                }
+            }
+            else {
+                apf.setStyleClass(btnPage.$button, "", ["un-read-message"]);
+                if(notificationType == "chat" && btnObj.notificationOpt) {
+                    if (btnObj.notificationOpt && btnObj.notificationOpt.name) {
+                        delete this.notificationMsgs[btnObj.notificationOpt.name];
+                        this.updateDocTitleNotifications();
+                    }
+                }
+            }
+            btnPage.setAttribute("caption", caption);
+        }
+        else {
+            btnPage.setAttribute("caption", caption);
+            apf.setStyleClass(btnPage.$button, "", ["un-read-message"]);
+            if(notificationType == "chat" && btnObj.notificationOpt) {
+                if (btnObj.notificationOpt && btnObj.notificationOpt.name) {
+                    delete this.notificationMsgs[btnObj.notificationOpt.name];
+                    this.updateDocTitleNotifications();
+                }
+            }
+        }
         
         return true;
+    },
+    
+    updateDocTitleNotifications: function(){
+        var _self    = this,
+            countMsg = 0;
+            
+        for(var i in this.notificationMsgs) {
+            if(this.notificationMsgs.hasOwnProperty(i))
+                countMsg += this.notificationMsgs[i];
+        }
+        
+        if(countMsg > 0) {
+            if(this.barNotificationTimer)
+                clearInterval(this.barNotificationTimer);
+            
+            this.barNotificationCount = 0;
+            this.barNotificationTimer = setInterval(function(){
+                if(_self.barNotificationCount%2)
+                    document.title = "(" + countMsg + ") message" + (countMsg > 1 ? "s" : "") + " | " + _self.initDocTitle;
+                else
+                    document.title = _self.initDocTitle;
+                
+                _self.barNotificationCount++;
+            }, 1000);
+        }
+        else {
+            if(this.barNotificationTimer) {
+                clearInterval(this.barNotificationTimer);
+                this.barNotificationCount = 0;
+                document.title = _self.initDocTitle;
+            }
+        }
     }
 });
 

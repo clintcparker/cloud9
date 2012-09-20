@@ -35,7 +35,7 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-define('ace/theme/crimson_editor',function(require, exports, module) {
+define('ace/theme/crimson_editor', ['require', 'exports', 'module', 'ace/lib/dom'], function(require, exports, module) {
 exports.isDark = false;
 exports.cssText = ".ace-crimson-editor .ace_editor {\
   border: 2px solid rgb(159, 159, 159);\
@@ -46,7 +46,7 @@ exports.cssText = ".ace-crimson-editor .ace_editor {\
 }\
 \
 .ace-crimson-editor .ace_gutter {\
-  background: #e8e8e8;\
+  background: #ebebeb;\
   color: #333;\
   overflow : hidden;\
 }\
@@ -62,7 +62,6 @@ exports.cssText = ".ace-crimson-editor .ace_editor {\
 }\
 \
 .ace-crimson-editor .ace_text-layer {\
-  cursor: text;\
   color: rgb(64, 64, 64);\
 }\
 \
@@ -171,6 +170,10 @@ exports.cssText = ".ace-crimson-editor .ace_editor {\
 \
 .ace-crimson-editor .ace_marker-layer .ace_active_line {\
   background: rgb(232, 242, 254);\
+}\
+\
+.ace-crimson-editor .ace_gutter_active_line {\
+    background-color : #dcdcdc;\
 }\
 \
 .ace-crimson-editor .ace_meta.ace_tag {\
