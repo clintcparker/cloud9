@@ -35,7 +35,7 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-define('ace/theme/tomorrow_night',function(require, exports, module) {
+define('ace/theme/tomorrow_night', ['require', 'exports', 'module', 'ace/lib/dom'], function(require, exports, module) {
 
 exports.isDark = true;
 exports.cssClass = "ace-tomorrow-night";
@@ -49,13 +49,13 @@ exports.cssText = "\
 }\
 \
 .ace-tomorrow-night .ace_gutter {\
-  background: #e8e8e8;\
-  color: #333;\
+  background: #25282c;\
+  color: #C5C8C6;\
 }\
 \
 .ace-tomorrow-night .ace_print_margin {\
   width: 1px;\
-  background: #e8e8e8;\
+  background: #25282c;\
 }\
 \
 .ace-tomorrow-night .ace_scroller {\
@@ -63,7 +63,6 @@ exports.cssText = "\
 }\
 \
 .ace-tomorrow-night .ace_text-layer {\
-  cursor: text;\
   color: #C5C8C6;\
 }\
 \
@@ -96,6 +95,10 @@ exports.cssText = "\
 \
 .ace-tomorrow-night .ace_marker-layer .ace_active_line {\
   background: #282A2E;\
+}\
+\
+.ace-tomorrow-night .ace_gutter_active_line {\
+  background-color: #282A2E;\
 }\
 \
 .ace-tomorrow-night .ace_marker-layer .ace_selected_word {\

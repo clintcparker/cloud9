@@ -32,6 +32,11 @@ var util = require("core/util");
 //    this.name = value;
 //};
 
+// used for local
+const OFFLINE = 1 << 2;
+const LOCAL = 1 << 4;
+const ONLINE = 1 << 6;
+
 var ext;
 module.exports = ext = {
     //Extension types
@@ -114,7 +119,7 @@ module.exports = ext = {
         return oExtension;
     },
 
-    unregister : function(oExtension, silent){
+    unregister : function(oExtension, silent) {
         //Check exts that depend on oExtension
         var using = oExtension.using;
         if (using) {
@@ -170,6 +175,10 @@ module.exports = ext = {
         }
 
         return true;
+    },
+    
+    getExtension : function(extension) {
+        return this.extLut[extension];
     },
 
     initExtension : function(oExtension, amlParent) {

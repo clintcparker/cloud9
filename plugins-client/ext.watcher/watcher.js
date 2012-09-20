@@ -34,7 +34,7 @@ module.exports = ext.register("ext/watcher/watcher", {
 
         function checkPage() {
             var page = tabEditors.getPage();
-            var data = page.$model.data;
+            var data = page && page.$model && page.$model.data;
             if (!data || !data.getAttribute)
                 return;
 
@@ -80,7 +80,7 @@ module.exports = ext.register("ext/watcher/watcher", {
                 );
                 btnQuestionYesToAll.setAttribute("visible", removedPathCount > 1);
                 btnQuestionNoToAll.setAttribute("visible", removedPathCount > 1);
-            } 
+            }
             else if (_self.changedPaths[path]) {
                 util.question(
                     "File changed, reload tab?",
@@ -120,6 +120,9 @@ module.exports = ext.register("ext/watcher/watcher", {
         }
 
         ide.addEventListener("openfile", function(e) {
+            if (e.type == "nofile")
+                return;
+
             var path = e.doc.getNode().getAttribute("path");
             _self.sendWatchFile(path);
         });
@@ -140,7 +143,7 @@ module.exports = ext.register("ext/watcher/watcher", {
             var path = ide.davPrefix + message.path.slice(ide.workspaceDir.length);
             path = path.replace(/\/$/, "");
 
-            if (_self.expandedPaths[path]) {
+            if (_self.expandedPaths[path] && message.subtype === "directorychange") {
                 return ide.dispatchEvent("treechange", {
                     path: path,
                     files: message.files
@@ -158,16 +161,15 @@ module.exports = ext.register("ext/watcher/watcher", {
 
             // allow another plugin to change the watcher behavior
             var eventData = {
-                path: path
+                path: path,
+                message: message
             };
 
-            if (ide.dispatchEvent("beforewatcherchange", eventData) === false) {
-                return;
-            }
+            if (ide.dispatchEvent("beforewatcherchange", eventData) === false) {
+                return;
+            }
 
             switch (message.subtype) {
-                case "create":
-                    break;
                 case "remove":
                     if (!_self.removedPaths[path]) {
                         _self.removedPaths[path] = path;
@@ -184,11 +186,13 @@ module.exports = ext.register("ext/watcher/watcher", {
                         checkPage();
                     }
                     break;
+                default:
+                    break;
             }
         });
 
         ide.addEventListener("init.ext/editors/editors", function(e) {
-            tabEditors.addEventListener("afterswitch", function(e) {
+            ide.addEventListener("tab.afterswitch", function(e) {
                 if (_self.disabled) {
                     return;
                 }
@@ -197,26 +201,25 @@ module.exports = ext.register("ext/watcher/watcher", {
         });
 
         ide.addEventListener("init.ext/tree/tree", function() {
-            var watcherFn = function(node, shouldWatch) {
+            var watcherFn = function(node, expanded) {
                 if (node && (node.getAttribute("type") === "folder" || node.tagName === "folder")) {
                     var path = node.getAttribute("path");
 
                     _self.expandedPaths[path] = path;
-                    _self[shouldWatch ? "sendWatchFile" : "sendUnwatchFile"](path);
+                    _self[expanded ? "sendWatchDirectory" : "sendUnwatchDirectory"](path);
                 }
             };
+
             trFiles.addEventListener("expand", function(e) {
-                if (_self.disabled) {
+                if (_self.disabled)
                     return;
-                }
                 watcherFn(e.xmlNode, true);
             });
 
             trFiles.addEventListener("collapse", function (e) {
-                if (_self.disabled) {
+                if (_self.disabled)
                     return;
-                }
-                watcherFn(e.xmlNode, true);
+                watcherFn(e.xmlNode, false);
             });
         });
     },
@@ -225,6 +228,22 @@ module.exports = ext.register("ext/watcher/watcher", {
         ide.send({
             "command"     : "watcher",
             "type"        : "watchFile",
+            "path"        : path.slice(ide.davPrefix.length).replace(/^\//, "")
+        });
+    },
+    
+    sendWatchDirectory : function(path) {
+        ide.send({
+            "command"     : "watcher",
+            "type"        : "watchDirectory",
+            "path"        : path.slice(ide.davPrefix.length).replace(/^\//, "")
+        });
+    },
+    
+    sendUnwatchDirectory : function(path) {
+        ide.send({
+            "command"     : "watcher",
+            "type"        : "unwatchDirectory",
             "path"        : path.slice(ide.davPrefix.length).replace(/^\//, "")
         });
     },
@@ -241,6 +260,7 @@ module.exports = ext.register("ext/watcher/watcher", {
         this.disabled = false;
 
         var _self = this;
+        
         var pages = tabEditors.getPages();
         pages.forEach(function(page) {
             if (page.$model) {
@@ -248,8 +268,8 @@ module.exports = ext.register("ext/watcher/watcher", {
             }
         });
 
-        for (var path in this.expandedPaths) {
-            this.sendWatchFile(path);
+        for (var path in _self.expandedPaths) {
+            _self.sendWatchDirectory(path);
         }
     },
 

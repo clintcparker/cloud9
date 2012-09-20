@@ -31,7 +31,7 @@ module.exports = ext.register("ext/save/save", {
 
     hook : function(){
         var _self = this;
-        
+
         commands.addCommand({
             name: "quicksave",
             hint: "save the currently active file to disk",
@@ -43,7 +43,7 @@ module.exports = ext.register("ext/save/save", {
                 _self.quicksave();
             }
         });
-        
+
         commands.addCommand({
             name: "saveas",
             hint: "save the file to disk with a different filename",
@@ -66,7 +66,7 @@ module.exports = ext.register("ext/save/save", {
                 _self.saveall();
             }
         });
-        
+
         commands.addCommand({
             name: "reverttosaved",
             bindKey: {mac: "Ctrl-Shift-Q", win: "Ctrl-Shift-Q"},
@@ -77,52 +77,54 @@ module.exports = ext.register("ext/save/save", {
                 _self.reverttosaved();
             }
         });
-        
+
         ide.addEventListener("init.ext/editors/editors", function(){
             tabEditors.addEventListener("close", _self.$close = function(e) {
                 var at = e.page.$at;
-                if (!at.undo_ptr)
-                    at.undo_ptr = at.$undostack[0];
                 var node = e.page.$doc.getNode();
+                
+                if (node.getAttribute("deleted"))
+                    return;
+                
                 if (node && (at.undo_ptr && at.$undostack[at.$undostack.length-1] !== at.undo_ptr
-                  || !at.undo_ptr && node.getAttribute("changed") == 1
-                  && e.page.$doc.getValue())) {
-    
+                  || !at.undo_ptr && node.getAttribute("changed") == 1)
+                  && (!node.getAttribute("newfile") || e.page.$doc.getValue())) {
                     ext.initExtension(_self);
-    
+
                     if (ide.dispatchEvent("beforesavewarn", {
                         page : e.page,
                         doc  : e.page.$doc
                     }) === false)
                         return;
-    
+
                     var pages   = tabEditors.getPages(),
                     currIdx = pages.indexOf(e.page);
                     tabEditors.set(pages[currIdx].id); //jump to file
-    
+
                     var filename = node.getAttribute("path").replace(ide.workspaceDir, "").replace(ide.davPrefix, "");
-    
+
                     winCloseConfirm.page = e.page;
                     winCloseConfirm.all  = -100;
                     winCloseConfirm.show();
-    
+
                     fileDesc.replaceMarkup("<div><h3>Save " + apf.escapeXML(filename) + "?</h3><div>This file has unsaved changes. Your changes will be lost if you don't save them.</div></div>", {"noLoadingMsg": false});
-    
+
                     winCloseConfirm.addEventListener("hide", function(){
                         if (winCloseConfirm.all != -100) {
                             var f = function(resetUndo){
                                 var page;
                                 if (!(page=winCloseConfirm.page))
                                     return;
-    
-                                tabEditors.remove(page, true, page.noAnim);
+                                delete winCloseConfirm.page;
                                 delete page.noAnim;
+                                
+                                page.dispatchEvent("aftersavedialogclosed");
+                                
+                                tabEditors.remove(page, true, page.noAnim);
                                 if (resetUndo)
                                     page.$at.undo(-1);
-                                delete winCloseConfirm.page;
-                                page.dispatchEvent("aftersavedialogclosed");
                             };
-    
+
                             if (winCloseConfirm.all == -200)
                                 _self.quicksave(winCloseConfirm.page, f);
                             else
@@ -131,13 +133,13 @@ module.exports = ext.register("ext/save/save", {
                         }
                         else
                             tabEditors.dispatchEvent("aftersavedialogcancel");
-    
+
                         winCloseConfirm.removeEventListener("hide", arguments.callee);
                     });
-    
+
                     btnYesAll.hide();
                     btnNoAll.hide();
-    
+
                     e.preventDefault();
                 }
             }, true);
@@ -182,10 +184,20 @@ module.exports = ext.register("ext/save/save", {
             itmRevertToSaved.disable();
             saveAsItem.disable();
         });
-        
+
         ide.addEventListener("afteronline", function(){
             itmRevertToSaved.enable();
             saveAsItem.enable();
+        });
+        
+        ide.addEventListener("afterreload", function(e){
+            var doc = e.doc;
+            var at = doc.$page.$at;
+            
+            at.addEventListener("afterchange", function(){
+                at.undo_ptr = at.$undostack[at.$undostack.length-1];
+                apf.xmldb.removeAttribute(doc.getNode(), "changed");
+            });
         });
     },
 
@@ -223,6 +235,35 @@ module.exports = ext.register("ext/save/save", {
                 delete winSaveAs.page;
             }
         });
+        
+        trSaveAs.addEventListener("beforerename", this.$beforerename = function(e){
+            if (!ide.onLine && !ide.offlineFileSystemSupport) return false;
+
+            if (trSaveAs.$model.data.firstChild == trSaveAs.selected)
+                return false;
+
+            // check for a path with the same name, which is not allowed to rename to:
+            var path = e.args[0].getAttribute("path"),
+                newpath = path.replace(/^(.*\/)[^\/]+$/, "$1" + e.args[1]).toLowerCase();
+
+            var exists, nodes = trSaveAs.getModel().queryNodes(".//node()");
+            for (var i = 0, len = nodes.length; i < len; i++) {
+                var pathLwr = nodes[i].getAttribute("path").toLowerCase();
+                if (nodes[i] != e.args[0] && pathLwr === newpath) {
+                    exists = true;
+                    break;
+                }
+            }
+
+            if (exists) {
+                util.alert("Error", "Unable to Rename",
+                    "That name is already taken. Please choose a different name.");
+                trSaveAs.getActionTracker().undo();
+                return false;
+            }
+
+            fs.beforeRename(e.args[0], e.args[1]);
+        });
     },
 
     reverttosaved : function(){
@@ -233,9 +274,9 @@ module.exports = ext.register("ext/save/save", {
         // previous version of this function used
         // .forEach(this.quicksave), but that also passes the index parameter (2nd one)
         // of forEach to the quicksave function.
-        var self = this;
+        var _self = this;
         tabEditors.getPages().forEach(function (page) {
-            self.quicksave(page);
+            _self.quicksave(page);
         });
     },
 
@@ -283,7 +324,7 @@ module.exports = ext.register("ext/save/save", {
 
         if (!page)
             return;
-            
+
         if (typeof callback !== "function") {
             callback = null;
         }
@@ -291,7 +332,7 @@ module.exports = ext.register("ext/save/save", {
         var corrected = ide.dispatchEvent("correctactivepage", {page: page});
         if (corrected)
             page = corrected;
-        
+
         var doc  = page.$doc;
         var node = doc.getNode();
         var path = node.getAttribute("path");
@@ -302,7 +343,7 @@ module.exports = ext.register("ext/save/save", {
         if (ide.dispatchEvent("beforefilesave", {node: node, doc: doc }) === false)
             return;
 
-        if (node.getAttribute("newfile")){
+        if (node.getAttribute("newfile") && !node.getAttribute("cli") && !node.getAttribute("ignore") !== "1"){
             this.saveas(page, callback);
             return;
         }
@@ -330,8 +371,16 @@ module.exports = ext.register("ext/save/save", {
         var value = doc.getValue();
 
         fs.saveFile(path, value, function(data, state, extra){
+
+            ide.dispatchEvent("track_action", {
+                type: "save as filetype",
+                fileType: node.getAttribute("name").split(".").pop().toLowerCase(),
+                success: state != apf.SUCCESS ? "false" : "true"
+            });
+            apf.xmldb.removeAttribute(node, "saving");
+
             if (state != apf.SUCCESS) {
-                util.alert(
+                return util.alert(
                     "Could not save document",
                     "An error occurred while saving this document",
                     "Please see if your internet connection is available and try again. "
@@ -340,20 +389,16 @@ module.exports = ext.register("ext/save/save", {
                             : "The error reported was " + extra.message));
             }
 
+            page.$at.dispatchEvent("afterchange");
+
             ide.dispatchEvent("afterfilesave", {
                 node: node,
                 doc: doc,
                 value: value,
+                oldpath: path,
                 silentsave: silentsave
             });
 
-            ide.dispatchEvent("track_action", {
-                type: "save as filetype",
-                fileType: node.getAttribute("name").split(".").pop().toLowerCase(),
-                success: state != apf.SUCCESS ? "false" : "true"
-            });
-
-            apf.xmldb.removeAttribute(node, "saving");
             apf.xmldb.removeAttribute(node, "new");
             apf.xmldb.setAttribute(node, "modifieddate", apf.queryValue(extra.data, "//d:getlastmodified"));
 
@@ -363,9 +408,8 @@ module.exports = ext.register("ext/save/save", {
             }
         });
 
-        var at = page.$at
+        var at = page.$at;
         at.undo_ptr = at.$undostack[at.$undostack.length-1];
-        page.$at.dispatchEvent("afterchange");
         return false;
     },
 
@@ -377,6 +421,7 @@ module.exports = ext.register("ext/save/save", {
 
         var file = page.$model.data;
         var oldFile = file;
+        var oldPath = oldFile.getAttribute("path");
         var saving = parseInt(file.getAttribute("saving"), 10);
 
         if (saving) {
@@ -385,7 +430,7 @@ module.exports = ext.register("ext/save/save", {
         }
         apf.xmldb.setAttribute(file, "saving", "1");
 
-        var self = this;
+        var _self = this;
         var value = page.$doc.getValue();
         fs.saveFile(newPath, value, function(value, state, extra) {
             if (state != apf.SUCCESS) {
@@ -409,9 +454,9 @@ module.exports = ext.register("ext/save/save", {
             apf.xmldb.removeAttribute(oldFile, "saving");
             apf.xmldb.removeAttribute(file, "saving");
 
-            if (self.saveBuffer[path]) {
-                delete self.saveBuffer[path];
-                self._saveAsNoUI(page);
+            if (_self.saveBuffer[path]) {
+                delete _self.saveBuffer[path];
+                _self._saveAsNoUI(page);
             }
 
             if (parseInt(file.getAttribute("newfile") || "0", 10) === 1) {
@@ -424,9 +469,8 @@ module.exports = ext.register("ext/save/save", {
                                     .replace(/\//, "") || "node()";
                 if (self.trFiles && xpath) {
                     var oNode = trFiles.queryNode(xpath);
-                    if (oNode && !trFiles.queryNode('//node()[@path="' + newPath + '"]')) {
+                    if (oNode && !trFiles.queryNode('//node()[@path="' + newPath + '"]'))
                         apf.xmldb.appendChild(oNode, file);
-                    }
                 }
             }
 
@@ -434,19 +478,22 @@ module.exports = ext.register("ext/save/save", {
                 node: node,
                 doc: doc,
                 value: value,
+                oldpath: oldPath,
                 silentsave: false // It is a forced save, comes from UI
             });
         });
 
         var at = page.$at
         at.undo_ptr = at.$undostack[at.$undostack.length-1];
-        page.$at.dispatchEvent("afterchange");
+        page.$at.dispatchEvent("afterchange", {
+            newPath: newPath
+        });
     },
 
     choosePath : function(path, select) {
         fs.list((path.match(/(.*)\/[^/]*/) || {})[1] || path, function (data, state, extra) {
             if (new RegExp("<folder.*" + path + ".*>").test(data)) {
-                path  = path.replace(new RegExp('\/' + cloud9config.davPrefix.split('/')[1]), '')
+                path  = path.replace(new RegExp("\/" + cloud9config.davPrefix.split("/")[1]), "")
                             .replace(/\/([^/]*)/g, "/node()[@name=\"$1\"]")
                             .replace(/\/node\(\)\[@name="workspace"\]/, "")
                             .replace(/\//, "");
@@ -484,9 +531,9 @@ module.exports = ext.register("ext/save/save", {
             });
         }
 
-        var fooPath = path.split('/');
+        var fooPath = path.split("/");
         txtSaveAs.setValue(fooPath.pop());
-        lblPath.setProperty('caption', fooPath.join('/') + '/');
+        lblPath.setProperty("caption", fooPath.join("/") + "/");
         winSaveAs.show();
     },
 
@@ -495,8 +542,8 @@ module.exports = ext.register("ext/save/save", {
         page = page || tabEditors.getPage();
         var file = page.$model.data;
         var path = file.getAttribute("path");
-        var newPath = lblPath.getProperty('caption') + txtSaveAs.getValue();
-        
+        var newPath = lblPath.getProperty("caption") + txtSaveAs.getValue();
+
         var isReplace = false;
         // check if we're already saving!
         var saving = parseInt(file.getAttribute("saving"), 10);
@@ -507,19 +554,19 @@ module.exports = ext.register("ext/save/save", {
 
         //apf.xmldb.setAttribute(file, "saving", "1");
 
-        var self = this;
+        var _self = this;
         var doSave = function() {
             winSaveAs.hide();
-            self._saveAsNoUI(page, path, newPath, isReplace);
+            _self._saveAsNoUI(page, path, newPath, isReplace);
 
             if (window.winConfirm) {
                 winConfirm.hide();
-                
+
                 if (self["btnConfirmOk"] && btnConfirmOk.caption == "Yes")
                     btnConfirmOk.setCaption("Ok");
             }
         };
-        
+
         var doCancel = function() {
             if (window.winConfirm && btnConfirmOk.caption == "Yes")
                 btnConfirmOk.setCaption("Ok");
@@ -529,7 +576,7 @@ module.exports = ext.register("ext/save/save", {
                 if (exists) {
                     var name = newPath.match(/\/([^/]*)$/)[1];
                     var folder = newPath.match(/\/([^/]*)\/[^/]*$/)[1];
-                    
+
                     isReplace = true;
                     util.confirm(
                         "A file with this name already exists",
@@ -556,7 +603,7 @@ module.exports = ext.register("ext/save/save", {
         function expand(){
             var tabPage = tabEditors.getPage(),
                 path    = tabPage ? tabPage.$model.data.getAttribute('path') : false,
-                isNew   = tabPage.$model.data.getAttribute('newfile');
+                isNew   = tabPage ? tabPage.$model.data.getAttribute('newfile') : false;
             if (!isNew)
                 _self.choosePath(path);
             else
@@ -570,7 +617,25 @@ module.exports = ext.register("ext/save/save", {
             trSaveAs.addEventListener("afterload", expand);
         }
     },
+    
+    renameFile : function(node) {
+        var path = node.getAttribute("path");
+        var oldpath = node.getAttribute("oldpath");
+        davProject.rename(oldpath, path, true, false, function(data, state, extra) {
+            if (state !== apf.SUCCESS) {
+                // TODO: revert the rename!!
+                return;
+            }
 
+            ide.dispatchEvent("afterupdatefile", {
+                path: oldpath,
+                newPath: path,
+                xmlNode: node,
+                isFolder: node.getAttribute("type") === "folder"
+            });
+        });
+    },
+    
     enable : function(){
         this.nodes.each(function(item){
             item.enable();
@@ -590,10 +655,10 @@ module.exports = ext.register("ext/save/save", {
         menus.remove("File/Save");
         menus.remove("File/~", 800);
         menus.remove("File/Revert to Saved");
-        
+
         commands.removeCommandsByName(
             ["quicksave", "saveas", "saveall", "reverttosaved"]);
-        
+
         this.nodes.each(function(item){
             item.destroy(true, true);
         });

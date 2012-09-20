@@ -12,37 +12,45 @@
 
     "pm": "sm",
     "dependencies": {
-        "socket.io": "0.9.x",
-        "socket.io-client": "0.9.x",
-        "connect": "1.8.x",
+        "connect": "1.8.7",
 
         "sourcemint-loader-js": "0.x",
         "sourcemint-platform-nodejs": "0.x",
-        "http-error": "~0.0.1",
-        "simple-template": "~0.0.1",
+        "http-error": "0.0.1",
+        "simple-template": "0.0.1",
 
-        "optimist": "~0.3.1",
+        "optimist": "0.3.4",
         "dryice": "0.4.2",
 
         "mappings": "0.1.x",
-        "amd-loader": "~0.0.4"
+        "amd-loader": "0.0.4",
+        "async": "0.1.21",
+        "netutil": "0.0.1",
+        "architect": "0.1.4",
+        "connect-architect": "0.0.6",
+
+        "smith": "0.1.9",
+        "smith.io": "0.0.22"
     },
 
     "devDependencies": {
-        "nodeunit": "~0.7.4",
-        "sinon": "~1.3.4",
-        "rimraf": "~2.0.1"
+        "nodeunit": "0.7.4",
+        "sinon": "1.3.4",
+        "rimraf": "2.0.1",
+        "vfs-local": "0.1.6",
+        "vfs-nodefs-adapter": "0.0.4"
     },
 
     "mappings": {
-        "ace":          ["npm", "https://github.com/ajaxorg/ace/tarball/e496e734b27188f5d5f213a3eef0610e55dc2318"],
-        "apf":          ["npm", "https://github.com/ajaxorg/apf/tarball/10179a17662c221c72bb010bd7e4feda485d2b34"],
-        "architect":    ["npm", "https://github.com/c9/architect/tarball/6a7069e6d1b65a515af73d1dd92757da33bfc2a9"],
+        "ace":          ["npm", "https://github.com/ajaxorg/ace/tarball/7bd83a46d97ef2f79d8afe9bf38fec5c3745016a"],
+        "apf":          ["npm", "https://github.com/ajaxorg/apf/tarball/266b87a91c7498b3f4fc77f79da9a4cc53be7f8f"],
         "asyncjs":      ["npm", "https://github.com/ajaxorg/async.js/tarball/0b4ed5608a32c280a7690b5f52883d8d1fc0de08"],
-        "jsDAV":        ["npm", "https://github.com/ajaxorg/jsDAV/tarball/21c6fea18d3480ef2641d9889e531ded60216082"],
-        "v8debug":      ["npm", "https://github.com/ajaxorg/lib-v8debug/tarball/09ce2bef1c33add76ed5c52ce477df339101b435"],
-        "treehugger":   ["npm", "https://github.com/ajaxorg/treehugger/tarball/ed2b6ebb8a812de48f0dfb12b675b91c4e4b3170"],
-        "packager":     ["npm", "https://github.com/ajaxorg/packager/tarball/0b1aaac94d21a10a8ee8117495a71f788ca01372"]
+        "jsDAV":        ["npm", "https://github.com/ajaxorg/jsDAV/tarball/bee19ea38f0260de6658043fffa587bab955b5bf"],
+        "v8debug":      ["npm", "https://github.com/ajaxorg/lib-v8debug/tarball/d2fac9b09724cb2e75e2807191eace9bc27d3b52"],
+        "packager":     ["npm", "https://github.com/ajaxorg/packager/tarball/9d7e39b1221bfecb2b462079e77193d19898adaa"],
+        "vfs":          ["npm", "https://github.com/c9/vfs/tarball/61841e99eda6ea9a8b801fd145b9a0af286ad324"],
+        "vfs-architect":["npm", "https://github.com/c9/vfs-architect/tarball/43bd19b9e7b2ddb95bdc1116143ce7fb22c6a5d3"],
+        "treehugger":   ["npm", "https://github.com/ajaxorg/treehugger/tarball/d7ab6ada6ec802f8d4107dae038327c7fa9c5601"]
     },
 
     "repository" : {
@@ -55,6 +63,8 @@
     }],
 
     "scripts": {
-        "start": "sh ./bin/cloud9.sh"
+        "start": "sh ./bin/cloud9.sh",
+        "build-debug": "node ./scripts/build-debug",
+        "build-packed": "node ./scripts/build-packed"
     }
 }

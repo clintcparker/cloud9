@@ -1,16 +1,21 @@
 <!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml" xmlns:a="http://ajax.org/2005/aml" skipParse=[%real%]>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:a="http://ajax.org/2005/aml" skipParse="[%packed%]">
     <head profile="http://www.w3.org/2005/10/profile">
         <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
         <title>[%projectName%] - Cloud9</title>
         <meta name="description" content=""/>
         <meta name="keywords" content=""/>
-
+        <script type="text/javascript">
+        //<![CDATA[
+            if (<%local%>)
+                document.title += " Local";
+        //]]>
+        </script>
         <link rel="icon" type="image/gif" href="[%staticUrl%]/favicon.ico" />
 
         <link rel="stylesheet" type="text/css" href="[%staticUrl%]/ext/main/style/style.css" />
 
-        <script type="text/javascript" src="/[%socketIoUrl%]/socket.io.js"></script>
+        [%loadedDetectionScript%]
         <script type="text/javascript" src="[%staticUrl%]/require.js"></script>
         [%scripts%]
         <script type="text/javascript">
@@ -23,16 +28,22 @@
                 debug: <%debug%>,
                 sessionId: <%sessionId%>,
                 workspaceId: <%workspaceId%>,
+                runners: <%runners%>,
                 name: <%name%>,
+                uid: <%uid%>,
+                pid: <%pid%>,
                 readonly: <%readonly%>,
                 projectName: <%projectName%>,
                 version: <%version%>,
+                workerUrl: "[%workerUrl%]",
                 staticUrl: "[%staticUrl%]",
-                socketIoUrl: <%socketIoUrl%>,
-                socketIoTransports: <%socketIoTransports%>,
+                smithIo: <%smithIo%>,
                 hosted: [%hosted%],
+                local: <%local%>,
+                env: <%env%>,
                 settings: <%settingsXml%>,
-                real: <%real%> ? true : false
+                packed: <%packed%>,
+                packedName: <%packedName%>
             };
 
             // prevent console messages from crashing our app!
@@ -41,7 +52,7 @@
                 window.console = {log:K,debug:K,dir:K,trace:K,error:K,warn:K,profileStart:K,profileEnd:K};
             }
 
-            if (!cloud9config.real) {
+            if (!cloud9config.packed) {
                 var RELEASE = "release";
                 var DEBUG   = "debug";
                 var FILES   = "files";
@@ -57,46 +68,59 @@
             var config = <%requirejsConfig%>; 
 
             require(config, [apfLoc], function(){
-                if (!cloud9config.real) {
+                if (!cloud9config.packed) {
                     var list = ["core/ide", "core/ext", "core/util", 
                     "core/settings", "ext/main/main", "ext/editors/editors",
                     "ace/editor"];
                 }
                 else {
-                    var list = ["[%staticUrl%]/packed.js"];
+                    var list = ["[%staticUrl%]/" + (cloud9config.packedName.length > 0 ? cloud9config.packedName : "packed.js")];
                 }
                 
                 require(list, function(ide, ext, util){
-                    if (!cloud9config.real) {
+                    if (!cloud9config.packed) {
                         var plugins = <%plugins%>;
                     }
-                    else {
-                        var ide = require("core/ide"), ext = require("core/ext"), util = require("core/util");
-                    }
                     
+                    // if you pass `force=true` into the querystring, then
+                    // we bypass the browser check
+                    if (window.cloud9config.hosted && !window.location.search.match(/\bforce\=true\b/)) {
+                        // otherwise, ask apf
+                        if (apf.isIE) {
+                            // redirect to the notsupported page
+                            var ref = encodeURIComponent(window.location.pathname + window.location.search);
+                            window.location.href = "/site/notsupported.html?ref=" + ref;
+                        }
+                    }
+
                     var aceConfig = require("ace/config");
 
                     aceConfig.set("packaged", true);
-                    aceConfig.set("workerPath", "/static/ace/worker");
+                    aceConfig.set("workerPath", "[%workerUrl%]/ace/worker");
                     aceConfig.set("modePath", "[%staticUrl%]/ace/mode");
                     aceConfig.set("themePath", "[%staticUrl%]/ace/theme");
                     
                     //Load extensions
-                    if (!cloud9config.real) {
+                    if (!cloud9config.packed) {
                         apf.addEventListener("load", function(){
                             require(plugins, function() {
-                                loadAndBegin(plugins);
+                                loadAndBegin(ide, plugins);
                             });
                         });
                     }
                     else {
-                        loadAndBegin(list);
+                        apf.addEventListener("load", function() {
+                            var ide = require("core/ide");
+                            window.ide = ide;
+                            loadAndBegin(ide, list);
+                        });
                     }
+
                 });
                 preloaderImgs();
             });
 
-            function loadAndBegin(plugins) {
+            function loadAndBegin(ide, plugins) {
                 ide.dispatchEvent("extload", {modules: plugins});
 
                 cloud9config.totalTime = new Date() - cloud9config.startdate;
@@ -129,46 +153,5 @@
         </script>
     </head>
     <body style="display:none">
-        <div id="noscript">
-            <div class="noscript">
-                <div id="hp_header">
-                    <div id="logo"></div>
-                </div>
-                <div class="oldbro_middle_panel">
-                    <div class="content">
-                        <p>Your browser is not supported by ajax.org. Please upgrade your browser to one of these modern browsers.</p>
-                        <span class="browser_option">
-                            <a href="http://www.mozilla.com/firefox" target="_blank">
-                                <img src="[%staticUrl%]/ext/main/style/images/browsers/ff_32x32.png" alt="" />
-                                <div>Mozilla Firefox</div>
-                            </a>
-                        </span>
-                        <span class="browser_option" style="width:50px;">
-                            <a href="http://www.apple.com/safari" target="_blank">
-                                <img src="[%staticUrl%]/ext/main/style/images/browsers/safari_32x32.png" alt="" />
-                                <div>Safari</div>
-                            </a>
-                        </span>
-                        <span class="browser_option">
-                            <a href="http://www.google.com/chrome" target="_blank">
-                                <img src="[%staticUrl%]/ext/main/style/images/browsers/chrome_32x32.png" alt="" />
-                                <div>Google Chrome</div>
-                            </a>
-                        </span>
-                        <span class="browser_option">
-                            <a href="http://www.microsoft.com/windows/internet-explorer" target="_blank">
-                                <img src="[%staticUrl%]/ext/main/style/images/browsers/ie_32x32.png" alt="" />
-                                <div>Internet Explorer</div>
-                            </a>
-                        </span>
-                    </div>
-                </div>
-                <div class="wn_main_section_rounded">
-                    <div class="wnmsr_left"></div>
-                    <div class="wnmsr_middle"></div>
-                    <div class="wnmsr_right"></div>
-                </div>
-            </div>
-        </div>
     </body>
 </html>

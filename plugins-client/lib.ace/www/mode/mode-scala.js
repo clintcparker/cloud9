@@ -117,7 +117,7 @@ oop.inherits(Mode, TextMode);
     };
     
     this.createWorker = function(session) {
-        var worker = new WorkerClient(["ace"], "worker-javascript.js", "ace/mode/javascript_worker", "JavaScriptWorker");
+        var worker = new WorkerClient(["ace"], "ace/mode/javascript_worker", "JavaScriptWorker");
         worker.attachToDocument(session.getDocument());
             
         worker.on("jslint", function(results) {
@@ -307,6 +307,22 @@ var JavaScriptHighlightRules = function() {
                 ],
                 regex : "(" + identifierRe +")(\\s*)(=)(\\s*)(function)(\\s*)(\\()",
                 next: "function_arguments"
+            }, { // match stuff like: Sound.play = function play() {  }
+                token : [
+                    "storage.type",
+                    "punctuation.operator",
+                    "entity.name.function",
+                    "text",
+                    "keyword.operator",
+                    "text",
+                    "storage.type",
+                    "text",
+                    "entity.name.function",
+                    "text",
+                    "paren.lparen"
+                ],
+                regex : "(" + identifierRe + ")(\\.)(" + identifierRe +")(\\s*)(=)(\\s*)(function)(\\s+)(\\w+)(\\s*)(\\()",
+                next: "function_arguments"
             }, { // match regular function like: function myFunc(arg) { }
                 token : [
                     "storage.type",
@@ -480,7 +496,7 @@ var JavaScriptHighlightRules = function() {
         "function_arguments": [
             {
                 token: "variable.parameter",
-                regex: identifierRe,
+                regex: identifierRe
             }, {
                 token: "punctuation.operator",
                 regex: "[, ]+",
@@ -783,6 +799,49 @@ var CstyleBehaviour = function () {
         }
     });
 
+    this.add("brackets", "insertion", function (state, action, editor, session, text) {
+        if (text == '[') {
+            var selection = editor.getSelectionRange();
+            var selected = session.doc.getTextRange(selection);
+            if (selected !== "") {
+                return {
+                    text: '[' + selected + ']',
+                    selection: false
+                };
+            } else {
+                return {
+                    text: '[]',
+                    selection: [1, 1]
+                };
+            }
+        } else if (text == ']') {
+            var cursor = editor.getCursorPosition();
+            var line = session.doc.getLine(cursor.row);
+            var rightChar = line.substring(cursor.column, cursor.column + 1);
+            if (rightChar == ']') {
+                var matching = session.$findOpeningBracket(']', {column: cursor.column + 1, row: cursor.row});
+                if (matching !== null) {
+                    return {
+                        text: '',
+                        selection: [1, 1]
+                    };
+                }
+            }
+        }
+    });
+
+    this.add("brackets", "deletion", function (state, action, editor, session, range) {
+        var selected = session.doc.getTextRange(range);
+        if (!range.isMultiLine() && selected == '[') {
+            var line = session.doc.getLine(range.start.row);
+            var rightChar = line.substring(range.start.column + 1, range.start.column + 2);
+            if (rightChar == ']') {
+                range.end.column++;
+                return range;
+            }
+        }
+    });
+
     this.add("string_dquotes", "insertion", function (state, action, editor, session, text) {
         if (text == '"' || text == "'") {
             var quote = text;
@@ -942,25 +1001,27 @@ var FoldMode = exports.FoldMode = function() {};
             return "end";
         return "";
     };
-    
+
     this.getFoldWidgetRange = function(session, foldStyle, row) {
         return null;
     };
 
     this.indentationBlock = function(session, row, column) {
-        var re = /^\s*/;
+        var re = /\S/;
+        var line = session.getLine(row);
+        var startLevel = line.search(re);
+        if (startLevel == -1)
+            return;
+
+        var startColumn = column || line.length;
+        var maxRow = session.getLength();
         var startRow = row;
         var endRow = row;
-        var line = session.getLine(row);
-        var startColumn = column || line.length;
-        var startLevel = line.match(re)[0].length;
-        var maxRow = session.getLength()
-        
-        while (++row < maxRow) {
-            line = session.getLine(row);
-            var level = line.match(re)[0].length;
 
-            if (level == line.length)
+        while (++row < maxRow) {
+            var level = session.getLine(row).search(re);
+
+            if (level == -1)
                 continue;
 
             if (level <= startLevel)
@@ -975,9 +1036,9 @@ var FoldMode = exports.FoldMode = function() {};
         }
     };
 
-    this.openingBracketBlock = function(session, bracket, row, column, typeRe, allowBlankLine) {
+    this.openingBracketBlock = function(session, bracket, row, column, typeRe) {
         var start = {row: row, column: column + 1};
-        var end = session.$findClosingBracket(bracket, start, typeRe, allowBlankLine);
+        var end = session.$findClosingBracket(bracket, start, typeRe);
         if (!end)
             return;
 
@@ -985,7 +1046,7 @@ var FoldMode = exports.FoldMode = function() {};
         if (fw == null)
             fw = this.getFoldWidget(session, end.row);
 
-        if (fw == "start") {
+        if (fw == "start" && end.row > start.row) {
             end.row --;
             end.column = session.getLine(end.row).length;
         }
@@ -1072,11 +1133,16 @@ var ScalaHighlightRules = function() {
                 token : "string.regexp",
                 regex : "[/](?:(?:\\[(?:\\\\]|[^\\]])+\\])|(?:\\\\/|[^\\]/]))*[/]\\w*\\s*(?=[).,;]|$)"
             }, {
-                token : "string", // single line
-                regex : '["](?:(?:\\\\.)|(?:[^"\\\\]))*?["]'
+                token : "string",
+                regex : '"""',
+                next : "tstring"
             }, {
-                token : "string", // single line
-                regex : "['](?:(?:\\\\.)|(?:[^'\\\\]))*?[']"
+                token : "string",
+                regex : '"(?=.)', // " strings can't span multiple lines
+                next : "string"
+            }, {
+                token : "symbol.constant", // single line
+                regex : "'[\\w\\d_]+"
             }, {
                 token : "constant.numeric", // hex
                 regex : "0[xX][0-9a-fA-F]+\\b"
@@ -1127,6 +1193,36 @@ var ScalaHighlightRules = function() {
                 token : "comment", // comment spanning whole line
                 merge : true,
                 regex : ".+"
+            }
+        ],
+        "string" : [
+            {
+                token : "escape",
+                regex : '\\\\"',
+            }, {
+                token : "string",
+                merge : true,
+                regex : '"',
+                next : "start"
+            }, {
+                token : "string.invalid",
+                regex : '[^"\\\\]*$',
+                next : "start"
+            }, {
+                token : "string",
+                regex : '[^"\\\\]+',
+                merge : true
+            }
+        ],
+        "tstring" : [
+            {
+                token : "string", // closing comment
+                regex : '"{3,5}',
+                next : "start"
+            }, {
+                token : "string", // comment spanning whole line
+                merge : true,
+                regex : ".+?"
             }
         ]
     };

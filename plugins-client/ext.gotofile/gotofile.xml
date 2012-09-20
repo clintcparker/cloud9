@@ -2,29 +2,20 @@
     <a:bar id="winGoToFile"
       buttons   = "close" 
       width     = "500" 
-      skin      = "basic"
+      skin      = "winGoToFile"
       minheight = "35"
       maxheight = "400"
       zindex    = "99999"
       showtab   = "[{require('ext/settings/settings').model}::auto/tabs/@show]"
       top       = "6"
-      style     = "
-        background:#e8e8e8;
-        box-shadow:0 5px 7px rgba(0,0,0,0.5);
-        border:1px solid #bbb;
-        border-width:0 1px 1px 1px;
-        position:absolute;
-        left:50%;
-        margin-left:-250px;
-        top : 37px;
-      ">
-        <a:vbox edge="0 5 5 5" padding="5" anchors2="0 0 0 0">
+      >
+        <a:vbox edge="5 5 5 5" padding="5" anchors2="0 0 0 0">
             <a:textbox id="txtGoToFile" realtime="true" skin="searchbox_textbox" focusselect="true" />
             <a:list id="dgGoToFile"
               class           = "searchresults noscrollbar"
               skin            = "lineselect"
               maxheight       = "350"
-              model           = "{require('ext/openfile/openfile').model}"
+              model           = "{require('ext/gotofile/gotofile').model}"
               scrollbar       = "sbShared 32 7 7"
               viewport        = "virtual"
               multiselect     = "true"
@@ -37,9 +28,30 @@
                     <span>{
                         (apf.getFilename(value) || "").replace(re, <strong>$1</strong>);
                     }</span>
-                    value.replace(re, <strong>$1</strong>);
+                    <span class="path">{value.replace(re, <strong>$1</strong>);}</span>
                 ?></a:caption>
             </a:list>
         </a:vbox>
     </a:bar>
+
+    <a:window id = "winBlockGotoFile"
+      title   = "Can't Use GotoFile!"
+      icon      = ""
+      center    = "true"
+      kbclose   = "true"
+      buttons   = "close"
+      width     = "600"
+      skin      = "bk-window2"
+      render    = "runtime"
+      class     = "relative"
+      model     = "true">
+        <a:vbox padding="10" edge="15 20 25 20">
+            <h4>Generic workspaces can't use gotofile!</h4>
+            <p>Due to the size of your filesystem, we can't launch gotofile. In the future, we will provide an update to resolve this limitation.</p>
+            <p>Smaller workspaces and folders can continue to use gotofile.</p>
+       </a:vbox>
+        <a:hbox edge="6 10 10" pack="end" padding="8">
+            <a:button onclick = "winBlockGotoFile.close();" skin="btn-default-css3" class="btn-green">Got it</a:button>
+        </a:hbox>
+    </a:window>
 </a:application>

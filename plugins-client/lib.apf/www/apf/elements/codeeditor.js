@@ -43,10 +43,10 @@ var Editor = require("ace/editor").Editor;
 var EditSession = require("ace/edit_session").EditSession;
 var VirtualRenderer = require("ace/virtual_renderer").VirtualRenderer;
 var UndoManager = require("ace/undomanager").UndoManager;
-var Range = require("ace/range").Range;
 var MultiSelect = require("ace/multi_select").MultiSelect;
 var ProxyDocument = require("ext/code/proxydocument");
 var Document = require("ace/document").Document;
+var dom = require("ace/lib/dom");
 
 require("ace/lib/fixoldbrowsers");
 
@@ -76,9 +76,9 @@ apf.codeeditor = module.exports = function(struct, tagName) {
     this.$booleanProperties["gutterline"]               = true;
     this.$booleanProperties["caching"]                  = true;
     this.$booleanProperties["readonly"]                 = true;
-    this.$booleanProperties["activeline"]               = true;
     this.$booleanProperties["showinvisibles"]           = true;
     this.$booleanProperties["showprintmargin"]          = true;
+    this.$booleanProperties["showindentguides"]         = true;
     this.$booleanProperties["overwrite"]                = true;
     this.$booleanProperties["softtabs"]                 = true;
     this.$booleanProperties["gutter"]                   = true;
@@ -94,7 +94,7 @@ apf.codeeditor = module.exports = function(struct, tagName) {
 
     this.$supportedProperties.push("value", "syntax", "activeline", "selectstyle",
         "caching", "readonly", "showinvisibles", "showprintmargin", "printmargincolumn",
-        "overwrite", "tabsize", "softtabs", "debugger", "model-breakpoints", "scrollspeed",
+        "overwrite", "tabsize", "softtabs", "scrollspeed", "showindentguides",
         "theme", "gutter", "highlightselectedword", "autohidehorscrollbar", "animatedscroll",
         "behaviors", "folding", "newlinemode", "globalcommands", "fadefoldwidgets",
         "gutterline");
@@ -197,85 +197,10 @@ apf.codeeditor = module.exports = function(struct, tagName) {
 
         _self.$editor.setShowPrintMargin(_self.showprintmargin);
 
-        // remove existing markers
-        _self.$clearMarker();
-
         _self.$editor.setSession(doc);
-
-        // clear breakpoints
-        doc.setBreakpoints([]);
     };
 
-    this.afterOpenFile = function(doc) {
-        this.$updateMarker();
-        this.$updateBreakpoints(doc);
-    };
-
-    this.$clearMarker = function () {
-        if (this.$marker) {
-            this.$editor.renderer.removeGutterDecoration(this.$lastRow[0], this.$lastRow[1]);
-            this.$editor.getSession().removeMarker(this.$marker);
-            this.$marker = null;
-        }
-    };
-
-    /**
-     * Indicates whether we are going to set a marker
-     */
-    this.$updateMarkerPrerequisite = function () {
-        return this.$debugger && this.$debugger.$updateMarkerPrerequisite();
-    };
-
-    this.$updateMarker = function () {
-        this.$clearMarker();
-
-        var frame = this.$updateMarkerPrerequisite();
-        if (!frame) {
-            return;
-        }
-
-        var script = this.xmlRoot;
-        if (script.getAttribute("scriptid") !== frame.getAttribute("scriptid")) {
-            return;
-        }
-
-        var head = this.$debugger.$mdlStack.queryNode("frame[1]");
-        var isTop = frame == head;
-        var lineOffset = parseInt(script.getAttribute("lineoffset") || "0", 10);
-        var row = parseInt(frame.getAttribute("line"), 10) - lineOffset;
-        var range = new Range(row, 0, row + 1, 0);
-        this.$marker = this.$editor.getSession().addMarker(range, isTop ? "ace_step" : "ace_stack", "line");
-        var type = isTop ? "arrow" : "stack";
-        this.$lastRow = [row, type];
-        this.$editor.renderer.addGutterDecoration(row, type);
-        this.$editor.gotoLine(row + 1, parseInt(frame.getAttribute("column"), 10), false);
-    };
-
-    this.$updateBreakpoints = function(doc) {
-        doc = doc || this.$editor.getSession();
-
-        var rows = [];
-        if (this.xmlRoot && this.$breakpoints) {
-            var path = this.xmlRoot.getAttribute("path");
-            var scriptName = ide.workspaceDir + path.slice(ide.davPrefix.length);
-
-            var breakpoints = this.$breakpoints.queryNodes("//breakpoint[@script='" + scriptName + "']");
-
-            for (var i=0; i<breakpoints.length; i++) {
-                rows.push(parseInt(breakpoints[i].getAttribute("line"), 10) - parseInt(breakpoints[i].getAttribute("lineoffset"), 10));
-            }
-        }
-        doc.setBreakpoints(rows);
-    };
-
-    this.$toggleBreakpoint = function(row, session) {
-        var bp = session.getBreakpoints();
-        bp[row] = !bp[row];
-        session.setBreakpoints(bp);
-        var script = this.xmlRoot;
-        script.setAttribute("scriptname",
-            ide.workspaceDir + script.getAttribute("path").slice(ide.davPrefix.length));
-        this.$debugger.toggleBreakpoint(script, row, session.getLine(row));
+    this.afterOpenFile = function(doc, path) {
     };
 
     this.$propHandlers["theme"] = function(value) {
@@ -288,7 +213,8 @@ apf.codeeditor = module.exports = function(struct, tagName) {
     };
 
     this.$propHandlers["syntax"] = function(value) {
-        this.$editor.getSession().setMode(this.getMode(value));
+        this.$editor.session.setMode(this.getMode(value));
+        this.$editor.session.syntax = value;
     };
 
     this.getMode = function(syntax) {
@@ -325,6 +251,10 @@ apf.codeeditor = module.exports = function(struct, tagName) {
 
     this.$propHandlers["showinvisibles"] = function(value, prop, initial) {
         this.$editor.setShowInvisibles(value);
+    };
+    
+    this.$propHandlers["showindentguides"] = function(value, prop, initial) {
+        this.$editor.setDisplayIndentGuides(value);
     };
 
     this.$propHandlers["animatedscroll"] = function(value, prop, initial) {
@@ -395,77 +325,9 @@ apf.codeeditor = module.exports = function(struct, tagName) {
         this.$editor.setBehavioursEnabled(value);
     };
 
-    this.$propHandlers["model-breakpoints"] = function(value, prop, inital) {
-        this.$debuggerBreakpoints = false;
-
-        if (this.$breakpoints)
-            this.$breakpoints.removeEventListener("update", this.$onBreakpoint);
-
-        this.$breakpoints = value;
-
-        if (!this.$breakpoints) {
-            this.$updateBreakpoints();
-            return;
-        }
-
-        var _self = this;
-        _self.$updateBreakpoints();
-        this.$onBreakpoint = function() {
-            _self.$updateBreakpoints();
-        };
-        this.$breakpoints.addEventListener("update", this.$onBreakpoint);
-        this.$updateBreakpoints();
-    };
-
-    this.$propHandlers["debugger"] = function(value, prop, inital) {
-        if (this.$debugger) {
-            this.$debugger.removeEventListener("changeframe", this.$onChangeActiveFrame);
-            this.$debugger.removeEventListener("break", this.$onChangeActiveFrame);
-            this.$debugger.removeEventListener("beforecontinue", this.$onBeforeContinue);
-        }
-
-        if (typeof value === "string") {
-            //#ifdef __WITH_NAMESERVER
-            this.$debugger = apf.nameserver.get("debugger", value);
-            //#endif
-        } else {
-            this.$debugger = value;
-        }
-
-        if (!this.$breakpoints || this.$debuggerBreakpoints) {
-            this.setProperty("model-breakpoints", this.$debugger ? this.$debugger.$mdlBreakpoints : null);
-            this.$debuggerBreakpoints = true;
-        }
-
-        if (!this.$debugger) {
-            this.$updateMarker();
-            return;
-        }
-
-        this.$updateMarker();
-        var _self = this;
-        this.$onChangeActiveFrame = function(e) {
-            // if you dont have data, we aren't interested in ya
-            if (!e || !e.data) {
-                return;
-            }
-
-            _self.$updateMarker();
-        };
-        this.$onBeforeContinue = function() {
-            _self.$clearMarker();
-        };
-        this.$debugger.addEventListener("changeframe", this.$onChangeActiveFrame);
-        this.$debugger.addEventListener("break", this.$onChangeActiveFrame);
-        this.$debugger.addEventListener("beforecontinue", this.$onBeforeContinue);
-    };
-
     var propModelHandler = this.$propHandlers["model"];
     this.$propHandlers["model"] = function(value) {
         propModelHandler.call(this, value);
-
-        this.$updateMarker();
-        this.$updateBreakpoints();
     };
 
     this.addEventListener("xmlupdate", function(e){
@@ -496,7 +358,8 @@ apf.codeeditor = module.exports = function(struct, tagName) {
     //@todo cleanup and put initial-message behaviour in one location
     this.clear = function(){
         this.$propHandlers["value"].call(this, "", null, true);
-        this.$editor.resize();
+        this.$editor.resize(true);
+        //this.$editor.renderer.updateFull(true);
 
         this.dispatchEvent("clear");//@todo this should work via value change
     };
@@ -579,9 +442,7 @@ apf.codeeditor = module.exports = function(struct, tagName) {
     };
 
     //@todo
-    this.addEventListener("keydown", function(e){
-
-    }, true);
+    // this.addEventListener("keydown", function(e){}, true);
 
     /**** Init ****/
 
@@ -621,17 +482,7 @@ apf.codeeditor = module.exports = function(struct, tagName) {
         });
 
         ed.addEventListener("guttermousedown", function(e) {
-            if (_self.$debugger && ed.isFocused()) {
-                if (e.clientX - ed.container.getBoundingClientRect().left > 20)
-                    return;
-
-                var row = e.getDocumentPosition().row;
-                _self.$toggleBreakpoint(row, ed.getSession());
-                e.stop();
-            }
-            else {
-                _self.dispatchEvent("guttermousedown", e);
-            }
+            _self.dispatchEvent("guttermousedown", e);
         });
 
         ed.addEventListener("gutterdblclick", function(e) {
@@ -651,14 +502,18 @@ apf.codeeditor = module.exports = function(struct, tagName) {
             this.softtabs = doc.getUseSoftTabs(); //true
         if (this.scrollspeed === undefined)
             this.scrollspeed = ed.getScrollSpeed();
-        if (this.animatedscroll === undefined)
-            this.animatedscroll = ed.getAnimatedScroll();
         if (this.selectstyle === undefined)
             this.selectstyle = ed.getSelectionStyle();//"line";
-        if (this.activeline === undefined)
-            this.activeline = ed.getHighlightActiveLine();//true;
-        if (this.gutterline === undefined)
-            this.gutterline = ed.getHighlightGutterLine();//true;
+        
+        //@todo this is a workaround for a bug in handling boolean properties in apf.$setDynamicProperty
+        this.activeline = ed.getHighlightActiveLine();//true;
+        this.gutterline = ed.getHighlightGutterLine();//true;
+        this.animatedscroll = ed.getAnimatedScroll();//true
+        this.showindentguides = ed.getDisplayIndentGuides();//true
+        this.autohidehorscrollbar = !ed.renderer.getHScrollBarAlwaysVisible();//true
+        this.highlightselectedword = ed.getHighlightSelectedWord();
+        this.behaviors = !ed.getBehavioursEnabled();
+            
         if (this.readonly === undefined)
             this.readonly = ed.getReadOnly();//false;
         if (this.showinvisibles === undefined)
@@ -681,12 +536,6 @@ apf.codeeditor = module.exports = function(struct, tagName) {
             this.wrapmode = doc.getUseWrapMode(); //false
         if (this.gutter === undefined)
             this.gutter = ed.renderer.getShowGutter();
-        if (this.highlightselectedword === undefined)
-            this.highlightselectedword = ed.getHighlightSelectedWord();
-        if (this.autohidehorscrollbar)
-            this.autohidehorscrollbar = !ed.renderer.getHScrollBarAlwaysVisible();
-        if (this.behaviors === undefined)
-            this.behaviors = !ed.getBehavioursEnabled();
         if (this.folding === undefined)
             this.folding = true;
         if (this.newlinemode == undefined)
@@ -702,6 +551,183 @@ apf.codeeditor = module.exports = function(struct, tagName) {
 apf.config.$inheritProperties["initial-message"] = 1;
 
 apf.aml.setElement("codeeditor", apf.codeeditor);
+
+
+apf.codebox = function(struct, tagName) {
+    this.$init(tagName || "codebox", apf.NODE_VISIBLE, struct);
+};
+
+(function() {
+    this.$isTextInput = function(e){
+        return true;
+    };
+    this.$focussable = true; // This object can get the focus
+    this.$childProperty = "value";
+    this.value = "";
+
+    this.$draw = function(){
+        //Build Main Skin
+        this.$ext = this.$getExternal();
+        this.$input = this.$getLayoutNode("main", "input", this.$ext);
+        this.$button = this.$getLayoutNode("main", "button", this.$ext);
+        this.$inputInitFix = this.$getLayoutNode("main", "initialfix", this.$ext);
+
+        this.addEventListener("resize", function(e) {
+            this.$editor.resize();
+        });
+
+        this.$input.style.textShadow = "none";
+        var ace = this.createSingleLineAceEditor(this.$input);
+        
+        // disable unneded commands
+        ace.commands.removeCommands(["find", "replace", "replaceall", "gotoline", "findnext", "findprevious"]);
+        // todo is there a property for these?
+        ace.commands.removeCommands(["indent", "outdent"])
+        
+        this.$editor = this.ace = ace;
+        ace.renderer.setPadding(0);
+        this.ace.codebox = this;
+        
+        ace.on("focus", function() {
+            dom.removeCssClass(ace.codebox.$ext, "tb_textboxInitial");
+            
+            if (ace.renderer.initialMessageNode) {
+                ace.renderer.scroller.removeChild(ace.renderer.initialMessageNode);
+                ace.renderer.initialMessageNode = null;
+            }
+        });
+
+        function onBlur() {
+            if (ace.$isFocused || ace.session.getValue())
+                return;
+            dom.addCssClass(ace.codebox.$ext, "tb_textboxInitial");
+            
+            if (ace.renderer.initialMessageNode)
+                return;
+            ace.renderer.initialMessageNode = document.createTextNode(ace.codebox["initial-message"]);
+            ace.renderer.scroller.appendChild(ace.renderer.initialMessageNode);
+        }
+        ace.on("blur", onBlur);
+        setTimeout(onBlur, 100);
+        // todo should we do this here?
+        // ace.on("resize", function(){apf.layout.forceResize();});
+    };
+    this.getValue = function() {
+        return this.ace.session.getValue();
+    };
+    this.setValue = function(val) {
+        return this.ace.session.doc.setValue(val);
+    };
+    this.select = function() {
+        return this.ace.selectAll();
+    };
+    this.$focus = function(e){
+        if (!this.$ext || this.$ext.disabled)
+            return;
+
+        this.$setStyleClass(this.$ext, this.$baseCSSname + "Focus");
+
+        this.$editor.focus();
+    };
+
+    this.execCommand = function(command) {
+        this.ace.commands.exec(command, this.ace);
+    };
+
+    this.createSingleLineAceEditor = function(el) {        
+        var renderer = new VirtualRenderer(el);
+        el.style.overflow = "hidden";
+        renderer.scrollBar.element.style.top = "0";
+        renderer.scrollBar.element.style.display = "none";
+        renderer.scrollBar.orginalWidth = renderer.scrollBar.width;
+        renderer.scrollBar.width = 0;
+        renderer.content.style.height = "auto"; 
+
+        renderer.screenToTextCoordinates = function(x, y) {
+            var pos = this.pixelToScreenCoordinates(x, y);
+            return this.session.screenToDocumentPosition(
+                Math.min(this.session.getScreenLength() - 1, Math.max(pos.row, 0)),
+                Math.max(pos.column, 0)
+            );
+        };
+        
+        renderer.maxLines = 4;
+        renderer.$computeLayerConfigWithScroll = renderer.$computeLayerConfig;
+        renderer.$computeLayerConfig = function() {
+            var config = this.layerConfig;
+            var height = this.session.getScreenLength() * this.lineHeight;
+            if (config.height != height) {
+                var vScroll = height > this.maxLines * this.lineHeight;
+                
+                if (vScroll != this.$vScroll) {
+                    if (vScroll) {
+                        this.scrollBar.element.style.display = "";
+                        this.scrollBar.width = this.scrollBar.orginalWidth; 
+                        this.container.style.height = config.height + "px";
+                        height = config.height;
+                        this.scrollTop = height - this.maxLines * this.lineHeight;
+                    } else {
+                        this.scrollBar.element.style.display = "none";
+                        this.scrollBar.width = 0;
+                    }
+                    
+                    this.onResize();
+                    this.$vScroll = vScroll;
+                }                
+                
+                if (this.$vScroll)
+                    return renderer.$computeLayerConfigWithScroll();
+                
+                this.container.style.height = height + "px";
+                this.scroller.style.height = height + "px";
+                this.content.style.height = height + "px";
+                this._emit("resize");
+            }
+            
+            var longestLine = this.$getLongestLine();
+            var lastRow = this.session.getLength();
+
+            this.scrollTop = 0;            
+            config.width = longestLine;
+            config.padding = this.$padding;
+            config.firstRow = 0;
+            config.firstRowScreen = 0;
+            config.lastRow = lastRow;
+            config.lineHeight = this.lineHeight;
+            config.characterWidth = this.characterWidth;
+            config.minHeight = height;
+            config.maxHeight = height;
+            config.offset = 0;            
+            config.height = height;
+
+            this.$gutterLayer.element.style.marginTop = 0 + "px";
+            this.content.style.marginTop = 0 + "px";
+            this.content.style.width = longestLine + 2 * this.$padding + "px";
+        };
+        renderer.isScrollableBy = function(){return false};
+
+        renderer.setStyle("ace_one-line");
+        var editor = new Editor(renderer);
+        new MultiSelect(editor);
+        editor.session.setUndoManager(new UndoManager());
+
+        editor.setHighlightActiveLine(false);
+        editor.setShowPrintMargin(false);
+        editor.renderer.setShowGutter(false);
+        editor.renderer.setHighlightGutterLine(false);
+        
+        editor.$mouseHandler.$focusWaitTimout = 0;
+        
+        return editor;
+    },
+
+    this.$loadAml = function(){
+        if (typeof this["initial-message"] == "undefined")
+            this.$setInheritedAttribute("initial-message");
+    };
+
+}).call(apf.codebox.prototype = new apf.StandardBinding());
+apf.aml.setElement("codebox", apf.codebox);
 
 });
 // #endif

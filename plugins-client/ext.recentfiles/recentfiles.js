@@ -11,6 +11,7 @@ var ide = require("core/ide");
 var ext = require("core/ext");
 var settings = require("core/settings");
 var menus = require("ext/menus/menus");
+var editors = require("ext/editors/editors");
 
 module.exports = ext.register("ext/recentfiles/recentfiles", {
     dev         : "Ajax.org",
@@ -26,19 +27,19 @@ module.exports = ext.register("ext/recentfiles/recentfiles", {
         var _self = this;
 
         this.nodes.push(
-            this.menu = 
+            this.menu =
                 menus.addItemByPath("File/Open Recent/", null, 600),
-            
-            this.divider = 
+
+            this.divider =
               menus.addItemByPath("File/Open Recent/~", new apf.divider(), 1000000),
-            
+
             menus.addItemByPath("File/Open Recent/Clear Menu", new apf.item({
                 onclick : function(){
                     _self.clearMenu();
                 }
             }), 2000000)
         );
-        
+
         ide.addEventListener("settings.load", function(e){
             var model = e.model;
             var strSettings = model.queryValue("auto/recentfiles");
@@ -53,7 +54,7 @@ module.exports = ext.register("ext/recentfiles/recentfiles", {
                 }
 
                 _self.clearMenu();
-
+                
                 for (var i = currentSettings.length - 1; i >= 0; i--) {
                     _self.$add(currentSettings[i]);
                 }
@@ -97,7 +98,7 @@ module.exports = ext.register("ext/recentfiles/recentfiles", {
             };
 
             _self.$add(obj);
-            
+
             settings.save();
         }
 
@@ -124,17 +125,19 @@ module.exports = ext.register("ext/recentfiles/recentfiles", {
             this.menu.insertBefore(found, this.menu.firstChild);
         }
         else {
-            this.menu.insertBefore(new apf.item({
-                caption : def.caption,
-                value   : def.value,
-                onclick : function(){
-                    var node = apf.getXml("<file />");
-                    node.setAttribute("name", def.caption);
-                    node.setAttribute("path", def.value);
+            if (def.caption && def.value) {
+                this.menu.insertBefore(new apf.item({
+                    caption : def.caption,
+                    value   : def.value,
+                    onclick : function(){
+                        var node = apf.getXml("<file />");
+                        node.setAttribute("name", def.caption);
+                        node.setAttribute("path", def.value);
 
-                    ide.dispatchEvent("openfile", {doc: ide.createDocument(node)});
-                }
-            }), this.menu.firstChild);
+                        editors.gotoDocument({doc: ide.createDocument(node), origin: "recentfiles"});
+                    }
+                }), this.menu.firstChild);
+            }
         }
 
         while (this.menu.childNodes.length > 12) {
@@ -142,6 +145,11 @@ module.exports = ext.register("ext/recentfiles/recentfiles", {
         }
 
         this.changed = true;
+        var itemNodes = this.menu.selectNodes('item');
+        if (itemNodes.length == 1)
+            itemNodes[0].disable();
+        else
+            itemNodes[itemNodes.length - 1].enable();
     },
 
     clearMenu : function(){
@@ -151,6 +159,7 @@ module.exports = ext.register("ext/recentfiles/recentfiles", {
                 nodes[0].destroy(true, true);
             else break;
         }
+        this.menu.selectNodes('item')[0].disable();
     },
 
     enable : function(){
@@ -167,7 +176,7 @@ module.exports = ext.register("ext/recentfiles/recentfiles", {
 
     destroy : function(){
         menus.remove("File/Open Recent");
-        
+
         this.nodes.each(function(item){
             item.destroy(true, true);
         });

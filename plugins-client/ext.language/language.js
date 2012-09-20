@@ -10,11 +10,15 @@ var ext = require("core/ext");
 var ide = require("core/ide");
 var code = require("ext/code/code");
 var editors = require("ext/editors/editors");
+var EditSession = require("ace/edit_session").EditSession;
 var WorkerClient = require("ace/worker/worker_client").WorkerClient;
+var createUIWorkerClient = require("ext/language/worker").createUIWorkerClient;
+var isWorkerEnabled = require("ext/language/worker").isWorkerEnabled;
 
 var complete = require('ext/language/complete');
 var marker = require('ext/language/marker');
 var refactor = require('ext/language/refactor');
+var outline = require('ext/language/outline');
 var markup = require("text!ext/language/language.xml");
 var skin = require("text!ext/language/skin.xml");
 var css = require("text!ext/language/language.css");
@@ -25,8 +29,10 @@ var markupSettings = require("text!ext/language/settings.xml");
 var settings = require("ext/settings/settings");
 var isContinuousCompletionEnabled;
 
+/*global tabEditors:true cloud9config:true */
+
 module.exports = ext.register("ext/language/language", {
-    name    : "Javascript Outline",
+    name    : "Javascript Language Services",
     dev     : "Ajax.org",
     type    : ext.GENERAL,
     deps    : [editors, code],
@@ -42,14 +48,24 @@ module.exports = ext.register("ext/language/language", {
 
     hook : function() {
         var _self = this;
+        
+        if (!createUIWorkerClient || !isWorkerEnabled)
+            throw new Error("Language worker not loaded or updated; run 'sm install' or 'make worker'");
 
         var deferred = lang.deferredCall(function() {
             _self.setPath();
         });
 
         // We have to wait until the paths for ace are set - a nice module system will fix this
-        ide.addEventListener("extload", function(){
-            var worker = _self.worker = new WorkerClient(["treehugger", "ext", "ace", "c9"], "worker.js", "ext/language/worker", "LanguageWorker");
+        ide.addEventListener("extload", function() {
+            var worker;
+            if (!isWorkerEnabled()) {
+                worker = _self.worker = createUIWorkerClient();
+            }
+            else {
+                worker = _self.worker = new WorkerClient(
+                    ["treehugger", "ext", "ace", "c9"], "ext/language/worker", "LanguageWorker");
+            }
             complete.setWorker(worker);
 
             ide.addEventListener("afteropenfile", function(event){
@@ -71,6 +87,7 @@ module.exports = ext.register("ext/language/language", {
             marker.hook(_self, worker);
             complete.hook(_self, worker);
             refactor.hook(_self, worker);
+            outline.hook(_self, worker);
             keyhandler.hook(_self, worker);
 
             ide.dispatchEvent("language.worker", {worker: worker});
@@ -79,17 +96,30 @@ module.exports = ext.register("ext/language/language", {
             });
         }, true);
         
-        ide.addEventListener("settings.load", function(){
+        ide.addEventListener("settings.load", function() {
             settings.setDefaults("language", [
                 ["jshint", "true"],
                 ["instanceHighlight", "true"],
                 ["undeclaredVars", "true"],
-                ["unusedFunctionArgs", "true"],
-                ["continuousComplete", "false"]
+                ["unusedFunctionArgs", "false"],
+                ["continuousCompletion", _self.isInferAvailable() ? "true" : "false"]
             ]);
         });
 
         settings.addSettings("Language Support", markupSettings);
+
+        // disable ace worker
+        if (!EditSession.prototype.$startWorker_orig) {
+            EditSession.prototype.$startWorker_orig = EditSession.prototype.$startWorker;
+            EditSession.prototype.$startWorker = function() {
+                if (this.$modeId != "ace/mode/javascript")
+                    this.$startWorker_orig();
+            };
+        }
+    },
+
+    isInferAvailable : function() {
+        return cloud9config.hosted || !!require("core/ext").extLut["ext/jsinfer/jsinfer"];
     },
     
     init : function() {
@@ -106,14 +136,6 @@ module.exports = ext.register("ext/language/language", {
         var oldSelection = this.editor.selection;
         this.setPath();
 
-        ceEditor.addEventListener("loadmode", function(e) {
-            if (e.name === "ace/mode/javascript") {
-                e.mode.createWorker = function() {
-                    return null;
-                };
-            }
-        });
-        
         this.updateSettings();
         
         var defaultHandler = this.editor.keyBinding.onTextInput.bind(this.editor.keyBinding);
@@ -159,7 +181,10 @@ module.exports = ext.register("ext/language/language", {
         isContinuousCompletionEnabled = value;
     },
     
-    updateSettings: function() {
+    updateSettings: function(e) {
+        // check if some other setting was changed
+        if (e && e.xmlNode && e.xmlNode.tagName != "language")
+            return;
         // Currently no code editor active
         if (!editors.currentEditor || !editors.currentEditor.amlEditor || !tabEditors.getPage())
             return;
@@ -183,13 +208,13 @@ module.exports = ext.register("ext/language/language", {
         var cursorPos = this.editor.getCursorPosition();
         cursorPos.force = true;
         this.worker.emit("cursormove", {data: cursorPos});
-        isContinuousCompletionEnabled = settings.model.queryValue("language/@continuousComplete") === "true";
+        isContinuousCompletionEnabled = settings.model.queryValue("language/@continuousCompletion") != "false";
         this.setPath();
     },
 
     setPath: function() {
         // Currently no code editor active
-        if(!editors.currentEditor || !editors.currentEditor.ceEditor || !tabEditors.getPage())
+        if(!editors.currentEditor || !editors.currentEditor.ceEditor || !tabEditors.getPage() || !this.editor)
             return;
         var currentPath = tabEditors.getPage().getAttribute("id");
         this.worker.call("switchFile", [currentPath, editors.currentEditor.ceEditor.syntax, this.editor.getSession().getValue(), this.editor.getCursorPosition()]);

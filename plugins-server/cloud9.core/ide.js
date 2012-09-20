@@ -6,7 +6,6 @@
 "use strict";
 
 var assert = require("assert");
-var connect = require("connect");
 var User = require("./user");
 var fs = require("fs");
 var util = require("util");
@@ -22,47 +21,44 @@ var Ide = module.exports = function(options) {
     assert(options.workspaceId, "option 'workspaceId' is required");
     assert(options.workspaceDir, "option 'workspaceDir' is required");
     assert(options.requirejsConfig, "option 'requirejsConfig' is required");
-    assert(options.socketIoUrl, "option 'socketIoUrl' is required");
-    assert(options.socketIoTransports, "option 'socketIoTransports' is required");
-    assert.equal(options.workspaceDir.charAt(0), "/", "option 'workspaceDir' must be an absolute path");
+    assert(options.smithIo, "option 'smithIo' is required");
+   // assert.equal(options.workspaceDir.charAt(0), "/", "option 'workspaceDir' must be an absolute path");
 
     var staticUrl = options.staticUrl || "/static";
+    var workerUrl = options.workerUrl || "/static";
 
     this.workspaceDir = options.workspaceDir;
 
-
     options.plugins = options.plugins || [];
+
     this.options = {
         workspaceDir: this.workspaceDir,
         mountDir: options.mountDir || this.workspaceDir,
-        socketIoUrl: options.socketIoUrl,
-        socketIoTransports: options.socketIoTransports,
+        smithIo: options.smithIo,
         davPrefix: options.davPrefix,
         davPlugins: options.davPlugins || exports.DEFAULT_DAVPLUGINS,
         debug: (options.debug === true) ? true : false,
+        workerUrl: workerUrl,
         staticUrl: staticUrl,
         workspaceId: options.workspaceId,
+        runners: options.runners,
         plugins: options.plugins,
         bundledPlugins: options.bundledPlugins || [],
         requirejsConfig: options.requirejsConfig,
         projectName: options.projectName || this.workspaceDir.split("/").pop(),
         version: options.version,
         extra: options.extra,
-        real: (options.real === true) ? true : false,
-        hosted: !!options.hosted
+        hosted: !!options.hosted,
+        env: options.env,
+        local: options.local,
+        packed: options.packed,
+        packedName: options.packedName
     };
 
     this.$users = {};
     this.nodeCmd = options.exec || process.execPath;
 
     this.workspace = new Workspace(this);
-
-    var _self = this;
-    this.router = connect.router(function(app) {
-        app.get(/^(\/|\/index.html?)$/, function(req, res, next) {
-            _self.$serveIndex(req, res, next);
-        });
-    });
 };
 
 util.inherits(Ide, EventEmitter);
@@ -81,7 +77,10 @@ util.inherits(Ide, EventEmitter);
     };
 
     this.handle = function(req, res, next) {
-        this.router(req, res, next);
+        if (req.method == "GET" && req.parsedUrl.pathname.match(/^(\/|\/index.html?)$/))
+            this.$serveIndex(req, res, next);
+        else
+            next();
     };
 
     this.$serveIndex = function(req, res, next) {
@@ -109,38 +108,53 @@ util.inherits(Ide, EventEmitter);
             // TODO: Exclude applicable bundledPlugins
 
             var client_include = c9util.arrayToMap((permissions.client_include || "").split("|"));
-            for (var plugin in client_include)
+            for (var plugin in client_include) {
                 if (plugin)
                     plugins[plugin] = 1;
+            }
 
             var staticUrl = _self.options.staticUrl;
+            var workerUrl = _self.options.workerUrl;
             var aceScripts = '<script type="text/javascript" data-ace-worker-path="/static/js/worker" src="'
                 + staticUrl + '/ace/build/ace'
                 + (_self.options.debug ? "-uncompressed" : "") + '.js"></script>\n';
+
+            var loadedDetectionScript = "";
+            if (_self.options.local) {
+                loadedDetectionScript = '<script type="text/javascript" src="/c9local/ui/connected.js?workspaceId=' + _self.options.workspaceId + '"></script>';
+            }
 
             var replacements = {
                 davPrefix: _self.options.davPrefix,
                 workspaceDir: _self.options.workspaceDir,
                 debug: _self.options.debug,
+                workerUrl: workerUrl,
                 staticUrl: staticUrl,
-                socketIoUrl: _self.options.socketIoUrl,
-                socketIoTransports: _self.options.socketIoTransports,
+                smithIo: JSON.stringify(_self.options.smithIo),
                 sessionId: req.sessionID, // set by connect
+                uid: req.session.uid || req.session.anonid || 0,
+                pid: _self.options.pid || process.pid || 0,
                 workspaceId: _self.options.workspaceId,
                 plugins: Object.keys(plugins),
                 bundledPlugins: Object.keys(bundledPlugins),
                 readonly: (permissions.fs !== "rw"),
                 requirejsConfig: _self.options.requirejsConfig,
                 settingsXml: "",
-                scripts: (_self.options.debug || _self.options.real) ? "" : aceScripts,
+                runners: _self.options.runners,
+                scripts: (_self.options.debug || _self.options.packed) ? "" : aceScripts,
                 projectName: _self.options.projectName,
                 version: _self.options.version,
                 hosted: _self.options.hosted.toString(),
-                real: _self.options.real
+                env: _self.options.env || "local",
+                packed: _self.options.packed,
+                packedName: _self.options.packedName,
+                local: _self.options.local,
+                loadedDetectionScript: loadedDetectionScript
             };
 
             var settingsPlugin = _self.workspace.getExt("settings");
             var user = _self.getUser(req);
+
             if (!settingsPlugin || !user) {
                 index = template.fill(index, replacements);
                 res.end(index);
@@ -192,7 +206,7 @@ util.inherits(Ide, EventEmitter);
     };
 
     this.getUser = function(req) {
-        var uid = req.session.uid;
+        var uid = req.session.uid || req.session.anonid;
         if (!uid || !this.$users[uid])
             return null;
         else
@@ -210,10 +224,11 @@ util.inherits(Ide, EventEmitter);
 
     this.getPermissions = function(req) {
         var user = this.getUser(req);
+
         if (!user)
             return User.VISITOR_PERMISSIONS;
         else
-            return user.getPermissions();
+            return user.getPermissions() || User.VISITOR_PERMISSIONS;
     };
 
     this.hasUser = function(username) {
@@ -226,6 +241,7 @@ util.inherits(Ide, EventEmitter);
             return this.workspace.error("No session for user " + username, 401, message, client);
 
         user.addClientConnection(client, message);
+        this.emit("clientConnection", client);
     };
 
     this.onUserMessage = function(user, message, client) {
@@ -260,7 +276,7 @@ util.inherits(Ide, EventEmitter);
 
     this.dispose = function(callback) {
         this.emit("destroy");
-        
+
         this.workspace.dispose(callback);
     };
 }).call(Ide.prototype);

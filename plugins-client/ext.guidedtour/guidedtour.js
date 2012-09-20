@@ -38,12 +38,13 @@ module.exports = ext.register("ext/guidedtour/guidedtour", {
     skin    : {
         id   : "guidedtour",
         data : skin,
-        "media-path" : "/static/ext/guidedtour/images/"
+        "media-path" : ide.staticPrefix + "/ext/guidedtour/images/"
     },
     currentStep: -1,
     currentEl: null,
     nodes: [],
-
+    autodisable : ext.ONLINE | ext.LOCAL,
+    
     hook: function() {
         //this.launchGT();
     },
@@ -65,7 +66,7 @@ module.exports = ext.register("ext/guidedtour/guidedtour", {
         tourControlsDialog.addEventListener("hide", this.shutdown(this.hlElement));
     },
 
-    launchGT: function(){        
+    launchGT: function(){
         ext.initExtension(this);
         this.hideMenus();
         madeNewFile = wentToZen = madeDebug = deletedFile = false;
@@ -77,6 +78,11 @@ module.exports = ext.register("ext/guidedtour/guidedtour", {
         winTourButtonStart.show();
         winTourButtonClose.show();
         winTourButtonDone.hide();
+        
+        
+        //hide the seccond unneeded cover
+        var modalBackground = document.getElementsByClassName("bk-window-cover");
+        modalBackground[modalBackground.length - 2].style.opacity = "0";
     },
     
     hideMenus: function(){
@@ -267,7 +273,7 @@ module.exports = ext.register("ext/guidedtour/guidedtour", {
                     _self.currentEl = expandedDbg;
                 } 
                 else if (step.div == "ceEditorGutter") {
-                    _self.currentEl = (apf.XPath || apf.runXpath() || apf.XPath).selectNodes('DIV[2]/DIV[2]/DIV[2]', ceEditor.$ext);
+                    _self.currentEl = (apf.XPath || apf.runXpath() || apf.XPath).selectNodes('DIV[2]/DIV[1]/DIV[2]', ceEditor.$ext);
                 } 
                 else if (step.node !== undefined) {
                     _self.currentEl = (apf.XPath || apf.runXpath() || apf.XPath).selectNodes(step.div, apf.document.selectSingleNode(step.node).$ext);

@@ -1,12 +1,14 @@
 
-var config = require("./default");
+var plugins = require("./default");
 
-config.containers.master.plugins.forEach(function(plugin) {
+/*
+plugins.forEach(function(plugin) {
     if (plugin.packagePath) {
         if (/\/cloud9.core$/.test(plugin.packagePath)) {
-            plugin.socketIoTransports = ["websocket", "htmlfile", "xhr-multipart", "xhr-polling"];
+
         }
     }
 });
+*/
 
-module.exports = config;
+module.exports = plugins;

@@ -35,7 +35,7 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-define('ace/theme/merbivore_soft',function(require, exports, module) {
+define('ace/theme/merbivore_soft', ['require', 'exports', 'module', 'ace/lib/dom'], function(require, exports, module) {
 
 exports.isDark = true;
 exports.cssClass = "ace-merbivore-soft";
@@ -49,13 +49,13 @@ exports.cssText = "\
 }\
 \
 .ace-merbivore-soft .ace_gutter {\
-  background: #e8e8e8;\
-  color: #333;\
+  background: #262424;\
+  color: #E6E1DC;\
 }\
 \
 .ace-merbivore-soft .ace_print_margin {\
   width: 1px;\
-  background: #e8e8e8;\
+  background: #262424;\
 }\
 \
 .ace-merbivore-soft .ace_scroller {\
@@ -63,7 +63,6 @@ exports.cssText = "\
 }\
 \
 .ace-merbivore-soft .ace_text-layer {\
-  cursor: text;\
   color: #E6E1DC;\
 }\
 \
@@ -96,6 +95,10 @@ exports.cssText = "\
 \
 .ace-merbivore-soft .ace_marker-layer .ace_active_line {\
   background: #333435;\
+}\
+\
+.ace-merbivore-soft .ace_gutter_active_line {\
+  background-color: #333435;\
 }\
 \
 .ace-merbivore-soft .ace_marker-layer .ace_selected_word {\

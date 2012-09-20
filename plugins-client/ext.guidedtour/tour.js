@@ -262,9 +262,8 @@ this.tour = {
         time: 4
     }, {
         before: function() {
-            
             dbgCallStack && dbgCallStack.parentNode && dbgCallStack.parentNode.parentNode.hide();
-            dbg.continueScript();
+            dbg.main.continueScript();
             txtConsoleInput.setValue("git status");
         },
         el: (apf.XPath || apf.runXpath() || apf.XPath).selectNodes('DIV[1]', tabConsole.$ext),
@@ -276,10 +275,7 @@ this.tour = {
             require('ext/runpanel/runpanel').stop();
             
             if(trFiles.$model.queryNode("//file[@path='" + ide.davPrefix + "/helloWorld-guidedTour.js']")) {
-                require("ext/console/console").commandTextHandler({
-                    keyCode: 13,
-                    currentTarget: txtConsoleInput
-                });
+                require("ext/console/console").evalInputCommand(txtConsoleInput.getValue());
                 txtConsoleInput.setValue("rm helloWorld-guidedTour.js");
             }
         },
@@ -294,10 +290,8 @@ this.tour = {
             if(demoFile && !deletedFile) {
                 deletedFile = true;
                 tabEditors.remove(tabEditors.getPage());
-                require("ext/console/console").commandTextHandler({
-                    keyCode: 13,
-                    currentTarget: txtConsoleInput
-                });
+                require("ext/console/console").evalInputCommand(txtConsoleInput.getValue());
+                txtConsoleInput.setValue("");
                 trFiles.confirmed = true;
                 trFiles.remove(demoFile);
                 trFiles.confirmed = false;

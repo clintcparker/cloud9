@@ -30,12 +30,12 @@ module.exports = {
         var doc = new Document("hel hello2 hello3  hello2 abc");
         var matches = completer.complete(doc, null, {row: 0, column: 3}, null, function(matches) {
             matchSorter(matches);
-            //console.log("Matches:", matches);
+            console.log("Matches:", matches);
             assert.equal(matches.length, 2);
             assert.equal(matches[0].name, "hello2");
-            assert.equal(determineDistance(matches[0].score), 0); // no distance
+            assert.equal(determineDistance(matches[0].score), 1);
             assert.equal(matches[1].name, "hello3");
-            assert.equal(determineDistance(matches[1].score), 1);
+            assert.equal(determineDistance(matches[1].score), 2);
             next();
         });
     },
@@ -46,16 +46,16 @@ module.exports = {
             matchSorter(matches);
             assert.equal(matches.length, 1);
             assert.equal(matches[0].name, "equal");
-            assert.equal(determineDistance(matches[0].score), 9);
+            assert.equal(determineDistance(matches[0].score), 8);
         });
 
         completer.complete(doc, null, {row: 1, column: 30}, null, function(matches) {  // .mat|[0]
             matchSorter(matches);
             assert.equal(matches.length, 2);
             assert.equal(matches[0].name, "matches");
-            assert.equal(determineDistance(matches[0].score), 4);
+            assert.equal(determineDistance(matches[0].score), 3);
             assert.equal(matches[1].name, "matchers");
-            assert.equal(determineDistance(matches[1].score), 12);
+            assert.equal(determineDistance(matches[1].score), 11);
         });
         next();
     }
